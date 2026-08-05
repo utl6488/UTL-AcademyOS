@@ -1,0 +1,60 @@
+{
+  "common": {
+    "loading": "लोड हो रहा है...",
+    "save": "सहेजें",
+    "cancel": "रद्द करें",
+    "delete": "हटाएं",
+    "edit": "संपादित करें",
+    "create": "बनाएं",
+    "search": "खोजें...",
+    "noResults": "कोई परिणाम नहीं मिला",
+    "confirm": "पुष्टि करें",
+    "back": "वापस",
+    "next": "अगला",
+    "submit": "जमा करें",
+    "close": "बंद करें",
+    "yes": "हाँ",
+    "no": "नहीं"
+  },
+  "auth": {
+    "login": "साइन इन",
+    "signup": "खाता बनाएं",
+    "logout": "लॉग आउट",
+    "forgotPassword": "पासवर्ड भूल गए?",
+    "resetPassword": "पासवर्ड रीसेट करें",
+    "verifyEmail": "ईमेल सत्यापित करें",
+    "email": "ईमेल",
+    "password": "पासवर्ड"
+  },
+  "nav": {
+    "dashboard": "डैशबोर्ड",
+    "institute": "संस्थान",
+    "users": "उपयोगकर्ता",
+    "organization": "संगठन",
+    "questions": "प्रश्न बैंक",
+    "exams": "परीक्षाएं",
+    "results": "परिणाम",
+    "analytics": "विश्लेषण",
+    "ai": "AI सुविधाएं",
+    "billing": "बिलिंग",
+    "settings": "सेटिंग्स",
+    "grading": "ग्रेडिंग",
+    "admin": "प्रशासन",
+    "notifications": "सूचनाएं"
+  },
+  "exam": {
+    "start": "परीक्षा शुरू करें",
+    "submit": "परीक्षा जमा करें",
+    "timeRemaining": "शेष समय",
+    "question": "प्रश्न",
+    "marked": "समीक्षा के लिए चिह्नित",
+    "unanswered": "अनुत्तरित",
+    "answered": "उत्तरित"
+  },
+  "errors": {
+    "generic": "कुछ गलत हो गया",
+    "notFound": "पेज नहीं मिला",
+    "forbidden": "पहुंच अस्वीकृत",
+    "networkError": "नेटवर्क त्रुटि। कृपया अपना कनेक्शन जांचें।"
+  }
+}

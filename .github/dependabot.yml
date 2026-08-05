@@ -1,0 +1,81 @@
+version: 2
+updates:
+  # Root workspace deps (Husky, ESLint, Prettier, commitlint, tsc)
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '06:00'
+      timezone: 'Asia/Kolkata'
+    open-pull-requests-limit: 5
+    labels: ['deps', 'root']
+    groups:
+      dev-tooling:
+        patterns:
+          - 'eslint*'
+          - 'prettier*'
+          - '@typescript-eslint/*'
+          - 'husky'
+          - 'lint-staged'
+          - '@commitlint/*'
+      typescript:
+        patterns:
+          - 'typescript'
+          - 'tsup'
+
+  - package-ecosystem: 'npm'
+    directory: '/frontend'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '06:00'
+      timezone: 'Asia/Kolkata'
+    open-pull-requests-limit: 10
+    labels: ['deps', 'frontend']
+    groups:
+      react:
+        patterns:
+          - 'react'
+          - 'react-dom'
+          - '@types/react*'
+      tanstack:
+        patterns:
+          - '@tanstack/*'
+      radix:
+        patterns:
+          - '@radix-ui/*'
+      testing:
+        patterns:
+          - 'vitest'
+          - '@testing-library/*'
+          - '@playwright/*'
+          - 'playwright'
+
+  - package-ecosystem: 'npm'
+    directory: '/packages/shared'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+    open-pull-requests-limit: 3
+    labels: ['deps', 'shared']
+
+  - package-ecosystem: 'npm'
+    directory: '/backend'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+    open-pull-requests-limit: 10
+    labels: ['deps', 'backend']
+
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    labels: ['deps', 'ci']
+
+  - package-ecosystem: 'docker'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    labels: ['deps', 'docker']

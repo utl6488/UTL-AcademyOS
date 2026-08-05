@@ -1,0 +1,60 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search...",
+    "noResults": "No results found",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "submit": "Submit",
+    "close": "Close",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "auth": {
+    "login": "Sign in",
+    "signup": "Create account",
+    "logout": "Log out",
+    "forgotPassword": "Forgot password?",
+    "resetPassword": "Reset password",
+    "verifyEmail": "Verify email",
+    "email": "Email",
+    "password": "Password"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "institute": "Institute",
+    "users": "Users",
+    "organization": "Organization",
+    "questions": "Question Bank",
+    "exams": "Exams",
+    "results": "Results",
+    "analytics": "Analytics",
+    "ai": "AI Features",
+    "billing": "Billing",
+    "settings": "Settings",
+    "grading": "Grading",
+    "admin": "Admin",
+    "notifications": "Notifications"
+  },
+  "exam": {
+    "start": "Start Exam",
+    "submit": "Submit Exam",
+    "timeRemaining": "Time Remaining",
+    "question": "Question",
+    "marked": "Marked for Review",
+    "unanswered": "Unanswered",
+    "answered": "Answered"
+  },
+  "errors": {
+    "generic": "Something went wrong",
+    "notFound": "Page not found",
+    "forbidden": "Access denied",
+    "networkError": "Network error. Please check your connection."
+  }
+}

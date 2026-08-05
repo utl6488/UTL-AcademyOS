@@ -1,0 +1,951 @@
+// UTL-ExamPro — baseline schema (Phase 1).
+// Multi-tenant strategy: shared DB, shared schema, `tenantId` column on every
+// tenant-scoped table + composite indexes leading with `tenantId`.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector, pgcrypto, citext]
+}
+
+/// Institute / customer account. One row per paying institution.
+/// Contact + branding fields live here so the "Institute" is Tenant-shaped.
+model Tenant {
+  id                 String       @id @default(cuid())
+  name               String
+  slug               String       @unique
+  status             TenantStatus @default(ACTIVE)
+  timezone           String       @default("Asia/Kolkata")
+  logo               String?
+  address            String?
+  phone              String?
+  email              String?
+  website            String?
+  brandColor         String? // hex e.g. "#2563eb"
+  gradingScheme      String       @default("percentage") // percentage | gpa | grade_letter
+  passingPercentage  Int          @default(33)
+  settings           Json         @default("{}")
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  users          User[]
+  refreshTokens  RefreshToken[]
+  auditLogs      AuditLog[]
+  otpTokens      OtpToken[]
+  branches       Branch[]
+  academicYears  AcademicYear[]
+  classes        Class[]
+  sections       Section[]
+  batches        Batch[]
+  subjects       Subject[]
+  topics         Topic[]
+  importJobs     ImportJob[]
+  questions      Question[]
+  questionVersions QuestionVersion[]
+  exams          Exam[]
+  examAssignments ExamAssignment[]
+  examAttempts   ExamAttempt[]
+  attemptAnswers AttemptAnswer[]
+  attemptEvents  AttemptEvent[]
+  results        Result[]
+  aiUsages       AiUsage[]
+  aiFeedbacks    AiFeedback[]
+  studyPlans     StudentStudyPlan[]
+  embeddings     Embedding[]
+  subscription   Subscription?
+  invoices       Invoice[]
+
+  @@index([status])
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+/// User account. Every user (except the super-admin platform user) is scoped
+/// to exactly one tenant.
+model User {
+  id                String     @id @default(cuid())
+  tenantId          String
+  tenant            Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email             String
+  emailVerifiedAt   DateTime?
+  passwordHash      String
+  name              String
+  phone             String?
+  avatar            String?
+  role              UserRole
+  status            UserStatus @default(ACTIVE)
+  branchId          String?
+  branch            Branch?    @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  classId           String?
+  class             Class?     @relation(fields: [classId], references: [id], onDelete: SetNull)
+  sectionId         String?
+  section           Section?   @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  lastLoginAt       DateTime?
+  failedLoginCount  Int        @default(0)
+  lockedUntil       DateTime?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  refreshTokens    RefreshToken[]
+  otpTokens        OtpToken[]
+  auditLogs        AuditLog[]        @relation("AuditActor")
+  permissions      UserPermission[]
+  batchMemberships BatchMember[]
+  teachingBatches  Batch[]           @relation("BatchTeacher")
+  importJobs       ImportJob[]       @relation("ImportJobActor")
+  authoredQuestions Question[]       @relation("QuestionAuthor")
+  questionEdits    QuestionVersion[] @relation("QuestionEditor")
+  authoredExams    Exam[]            @relation("ExamAuthor")
+  studentAssignments ExamAssignment[] @relation("ExamAssignedStudent")
+  examAttempts     ExamAttempt[]
+  gradedAnswers    AttemptAnswer[]   @relation("AnswerGrader")
+  results          Result[]
+  aiFeedbacks      AiFeedback[]
+  studyPlans       StudentStudyPlan[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId, role])
+  @@index([tenantId, status])
+  @@index([tenantId, classId])
+}
+
+/// Mirrors `@utl/shared` `Role`. Keep values in sync.
+enum UserRole {
+  SUPER_ADMIN
+  INSTITUTE_OWNER
+  ADMIN
+  TEACHER
+  EXAM_COORDINATOR
+  STUDENT
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+  DELETED
+}
+
+/// Optional per-user permission override on top of the role default.
+model UserPermission {
+  userId     String
+  permission String
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, permission])
+  @@index([permission])
+}
+
+/// Refresh tokens with rotation and reuse detection.
+/// `familyId` groups the rotation chain. If any token in the family is used
+/// twice, the family is revoked (compromise signal).
+model RefreshToken {
+  id            String    @id @default(cuid())
+  tenantId      String
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash     String    @unique
+  familyId      String
+  expiresAt     DateTime
+  revokedAt     DateTime?
+  replacedById  String?
+  userAgent     String?
+  ip            String?
+  createdAt     DateTime  @default(now())
+
+  @@index([tenantId, userId])
+  @@index([familyId])
+  @@index([expiresAt])
+}
+
+/// One-time codes for email verification, password reset, invites.
+model OtpToken {
+  id        String       @id @default(cuid())
+  tenantId  String?
+  tenant    Tenant?      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose   OtpPurpose
+  tokenHash String       @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  meta      Json?
+  createdAt DateTime     @default(now())
+
+  @@index([userId, purpose])
+  @@index([expiresAt])
+}
+
+enum OtpPurpose {
+  EMAIL_VERIFY
+  PASSWORD_RESET
+  INVITE
+  MFA
+}
+
+/// Append-only audit trail of privileged actions.
+model AuditLog {
+  id         String   @id @default(cuid())
+  tenantId   String?
+  tenant     Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  actorId    String?
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  action     String
+  targetType String?
+  targetId   String?
+  meta       Json?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Org structure — Phase 3
+// Branch → Class → Section, Batch (with teacher + student members)
+// AcademicYear is orthogonal — pinned globally per tenant.
+// Subject → Topic (nested tree via parentId).
+// ---------------------------------------------------------------------------
+
+model Branch {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  code      String?
+  address   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  classes Class[]
+  users   User[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+}
+
+model AcademicYear {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String // e.g. "2025-2026"
+  startDate DateTime
+  endDate   DateTime
+  isCurrent Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isCurrent])
+}
+
+model Class {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branchId     String?
+  branch       Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  name         String
+  numericOrder Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sections Section[]
+  batches  Batch[]
+  users    User[]
+  subjects Subject[] @relation("ClassSubjects")
+  examAssignments ExamAssignment[] @relation("ExamAssignedClass")
+
+  @@unique([tenantId, name])
+  @@index([tenantId, numericOrder])
+  @@index([tenantId, branchId])
+}
+
+model Section {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  classId   String
+  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users User[]
+
+  @@unique([classId, name])
+  @@index([tenantId, classId])
+}
+
+model Batch {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  classId   String
+  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  teacherId String?
+  teacher   User?    @relation("BatchTeacher", fields: [teacherId], references: [id], onDelete: SetNull)
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members BatchMember[]
+  examAssignments ExamAssignment[] @relation("ExamAssignedBatch")
+
+  @@unique([tenantId, name])
+  @@index([tenantId, classId])
+  @@index([tenantId, teacherId])
+}
+
+/// Explicit join for students in batches (rather than a `batchId` on User,
+/// since a student may sit in multiple batches — e.g. main + JEE cohort).
+model BatchMember {
+  batchId   String
+  batch     Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([batchId, userId])
+  @@index([userId])
+}
+
+model Subject {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  code      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  classes   Class[]    @relation("ClassSubjects")
+  topics    Topic[]
+  questions Question[]
+
+  @@unique([tenantId, name])
+}
+
+model Topic {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  parentId  String?
+  parent    Topic?   @relation("TopicChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Topic[]  @relation("TopicChildren")
+  name      String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  questions Question[]
+
+  @@index([tenantId, subjectId, parentId])
+  @@index([subjectId, order])
+}
+
+// ---------------------------------------------------------------------------
+// Async import jobs (student CSV, etc.) — Phase 3.2
+// ---------------------------------------------------------------------------
+
+model ImportJob {
+  id             String          @id @default(cuid())
+  tenantId       String
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  actorId        String?
+  actor          User?           @relation("ImportJobActor", fields: [actorId], references: [id], onDelete: SetNull)
+  kind           ImportJobKind
+  status         ImportJobStatus @default(PENDING)
+  fileKey        String
+  totalRows      Int             @default(0)
+  processedRows  Int             @default(0)
+  successCount   Int             @default(0)
+  errorCount     Int             @default(0)
+  errors         Json            @default("[]")
+  meta           Json            @default("{}")
+  createdAt      DateTime        @default(now())
+  completedAt    DateTime?
+
+  @@index([tenantId, status, createdAt])
+}
+
+enum ImportJobKind {
+  STUDENT
+  TEACHER
+  QUESTION
+}
+
+enum ImportJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// ---------------------------------------------------------------------------
+// Question bank — Phase 4
+// Polymorphic per `type`: MCQ/MSQ/IMAGE_BASED use `options`, NUMERICAL uses
+// `tolerance`+`unit`, FILL_BLANK uses `blanks`, SHORT/LONG use `rubric`.
+// `content` holds the type-specific payload as JSON; `correctAnswer` is either
+// a scalar (bool/number/string) or an array (MSQ, FILL_BLANK).
+// ---------------------------------------------------------------------------
+
+enum QuestionType {
+  MCQ
+  MSQ
+  TRUE_FALSE
+  FILL_BLANK
+  NUMERICAL
+  SHORT_ANSWER
+  LONG_ANSWER
+  IMAGE_BASED
+}
+
+enum QuestionDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+model Question {
+  id            String             @id @default(cuid())
+  tenantId      String
+  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subjectId     String
+  subject       Subject            @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  topicId       String?
+  topic         Topic?             @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  createdById   String?
+  createdBy     User?              @relation("QuestionAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  type          QuestionType
+  text          String
+  difficulty    QuestionDifficulty @default(MEDIUM)
+  marks         Float              @default(1)
+  negativeMarks Float              @default(0)
+  tags          String[]           @default([])
+  // Type-specific payload — validated at the service boundary. Example shapes:
+  //   MCQ/MSQ/IMAGE_BASED: { options: [{ id, text, isCorrect }] }
+  //   NUMERICAL:           { tolerance: number, unit?: string }
+  //   FILL_BLANK:          { blanks: string[] }
+  //   SHORT/LONG_ANSWER:   { rubric?: string, modelAnswer: string }
+  //   IMAGE_BASED (extra): { imageUrl: string }
+  content        Json               @default("{}")
+  correctAnswer  Json?
+  explanation    String?
+  currentVersion Int                @default(1)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  versions QuestionVersion[]
+  examQuestions ExamQuestion[]
+  attemptAnswers AttemptAnswer[]
+
+  @@index([tenantId, subjectId])
+  @@index([tenantId, topicId])
+  @@index([tenantId, type])
+  @@index([tenantId, difficulty])
+  @@index([tenantId, createdAt])
+  // GIN index for tag search is added out-of-band via raw SQL migration.
+}
+
+/// Immutable snapshot of a Question at a given version. Written on every
+/// meaningful edit so teachers can audit + roll back if needed.
+model QuestionVersion {
+  id            String             @id @default(cuid())
+  tenantId      String
+  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  questionId    String
+  question      Question           @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  version       Int
+  editedById    String?
+  editedBy      User?              @relation("QuestionEditor", fields: [editedById], references: [id], onDelete: SetNull)
+  type          QuestionType
+  text          String
+  difficulty    QuestionDifficulty
+  marks         Float
+  negativeMarks Float
+  tags          String[]           @default([])
+  content       Json
+  correctAnswer Json?
+  explanation   String?
+  createdAt     DateTime           @default(now())
+
+  @@unique([questionId, version])
+  @@index([tenantId, questionId])
+}
+
+// ---------------------------------------------------------------------------
+// Exam authoring — Phase 5
+// Draft → SCHEDULED (published) → LIVE (auto-inferred by clock) → COMPLETED.
+// Assignments live in ExamAssignment (one row per class/batch/student ref).
+// Proctoring config is stored as JSON — see backend/task.md B9.a.
+// ---------------------------------------------------------------------------
+
+enum ExamStatus {
+  DRAFT
+  SCHEDULED
+  LIVE
+  COMPLETED
+  CANCELLED
+}
+
+/// `FLEXIBLE`: each student's timer starts on click within the window.
+/// `SYNCHRONOUS`: timer counts from `startAt` for everyone; ends at
+/// `startAt + duration` regardless of when each student joined.
+enum ExamMode {
+  FLEXIBLE
+  SYNCHRONOUS
+}
+
+model Exam {
+  id                String     @id @default(cuid())
+  tenantId          String
+  tenant            Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdById       String?
+  createdBy         User?      @relation("ExamAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  title             String
+  instructions      String?
+  status            ExamStatus @default(DRAFT)
+  mode              ExamMode   @default(FLEXIBLE)
+  durationMinutes   Int
+  totalMarks        Float
+  negativeMarking   Float      @default(0)
+  shuffleQuestions  Boolean    @default(false)
+  shuffleOptions    Boolean    @default(false)
+  startAt           DateTime?
+  endAt             DateTime?
+  lateEntryGraceMs  Int        @default(0)
+  lockdownOnLate    Boolean    @default(false)
+  proctoring        Json       @default("{}")
+  publishedAt       DateTime?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  sections    ExamSection[]
+  questions   ExamQuestion[]
+  assignments ExamAssignment[]
+  attempts    ExamAttempt[]
+  results     Result[]
+  resultsReleased Boolean @default(false)
+
+  @@index([tenantId, status])
+  @@index([tenantId, startAt])
+  @@index([tenantId, createdAt])
+}
+
+model ExamSection {
+  id              String   @id @default(cuid())
+  tenantId        String
+  examId          String
+  exam            Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  title           String
+  durationMinutes Int?
+  order           Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  questions ExamQuestion[]
+
+  @@index([examId, order])
+}
+
+model ExamQuestion {
+  id            String       @id @default(cuid())
+  tenantId      String
+  examId        String
+  exam          Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+  sectionId     String?
+  section       ExamSection? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  questionId    String
+  question      Question     @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  order         Int          @default(0)
+  marksOverride Float?
+  createdAt     DateTime     @default(now())
+
+  @@unique([examId, questionId])
+  @@index([examId, order])
+  @@index([sectionId, order])
+}
+
+/// One row per class/batch/student assigned to an exam. Exactly one of
+/// classId / batchId / studentId is set per row.
+model ExamAssignment {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  examId    String
+  exam      Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  classId   String?
+  class     Class?   @relation("ExamAssignedClass", fields: [classId], references: [id], onDelete: Cascade)
+  batchId   String?
+  batch     Batch?   @relation("ExamAssignedBatch", fields: [batchId], references: [id], onDelete: Cascade)
+  studentId String?
+  student   User?    @relation("ExamAssignedStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([examId, classId, batchId, studentId])
+  @@index([examId])
+  @@index([tenantId, studentId])
+}
+
+// ---------------------------------------------------------------------------
+// Attempt runtime — Phase 6
+// One `ExamAttempt` per (examId, studentId). `endsAt` is server-computed at
+// start; the client never dictates the exam clock. `AttemptAnswer.clientRevision`
+// enforces last-writer-wins with idempotency (retries don't clobber newer).
+// ---------------------------------------------------------------------------
+
+enum AttemptStatus {
+  NOT_STARTED
+  RESERVED
+  LOBBY           // SYNCHRONOUS-mode students waiting for startAt
+  IN_PROGRESS
+  SUBMITTED
+  AUTO_SUBMITTED  // ran past endsAt OR force-submitted by policy
+  LOCKED_OUT      // missed the late-entry grace with lockdownOnLate
+  EVALUATED
+}
+
+enum AttemptEventType {
+  HEARTBEAT
+  FULLSCREEN_EXIT
+  FULLSCREEN_ENTER
+  TAB_HIDDEN
+  TAB_VISIBLE
+  WINDOW_BLUR
+  WINDOW_FOCUS
+  COPY
+  PASTE
+  RIGHT_CLICK
+  PRINT_ATTEMPT
+  DEVTOOLS_SUSPECTED
+  SECOND_DISPLAY_DETECTED
+  DISCONNECT
+  RECONNECT
+  WARNING_SENT
+  FORCE_SUBMITTED
+}
+
+model ExamAttempt {
+  id             String        @id @default(cuid())
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  examId         String
+  exam           Exam          @relation(fields: [examId], references: [id], onDelete: Cascade)
+  studentId      String
+  student        User          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  status         AttemptStatus @default(NOT_STARTED)
+  reservedAt     DateTime?
+  startedAt      DateTime?
+  endsAt         DateTime?     // server-authoritative deadline
+  submittedAt    DateTime?
+  evaluatedAt    DateTime?
+  // Deterministic RNG seed → reproducible shuffled question/option order.
+  shuffleSeed    String?
+  // Cached shuffled order = array of { questionId, order } — populated on reserve/start
+  // so timer starts don't hit the DB for question ordering.
+  questionOrder  Json?
+  scoredMarks    Float?
+  autoScoredMarks Float?
+  hasPendingReview Boolean     @default(false)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  answers AttemptAnswer[]
+  events  AttemptEvent[]
+  result  Result?
+
+  @@unique([examId, studentId])
+  @@index([tenantId, status])
+  @@index([examId, status])
+  @@index([studentId])
+  @@index([endsAt])
+}
+
+model AttemptAnswer {
+  id             String   @id @default(cuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  attemptId      String
+  attempt        ExamAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId     String
+  question       Question @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  answer         Json?
+  isMarked       Boolean  @default(false)
+  clientRevision Int      @default(0)
+  timeSpentMs    Int      @default(0)
+  // Grading fields — populated by evaluator (objective) or teacher (subjective).
+  scoredMarks    Float?
+  feedback       String?
+  isAutoGraded   Boolean  @default(false)
+  gradedById     String?
+  gradedBy       User?    @relation("AnswerGrader", fields: [gradedById], references: [id], onDelete: SetNull)
+  gradedAt       DateTime?
+  answeredAt     DateTime?
+  updatedAt      DateTime @updatedAt
+
+  @@unique([attemptId, questionId])
+  @@index([tenantId, attemptId])
+  @@index([questionId])
+}
+
+model AttemptEvent {
+  id            String           @id @default(cuid())
+  tenantId      String
+  tenant        Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  attemptId     String
+  attempt       ExamAttempt      @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  type          AttemptEventType
+  clientEventId String?          // for idempotent batch ingest
+  clientAt      DateTime?
+  serverAt      DateTime         @default(now())
+  meta          Json?
+
+  @@unique([attemptId, clientEventId])
+  @@index([tenantId, attemptId, serverAt])
+  @@index([attemptId, type])
+}
+
+model Result {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  tenant             Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  attemptId          String   @unique
+  attempt            ExamAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  examId             String
+  exam               Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  studentId          String
+  student            User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  score              Float
+  maxScore           Float
+  accuracy           Float    // 0..1
+  timeSpentMs        Int      @default(0)
+  correctCount       Int      @default(0)
+  wrongCount         Int      @default(0)
+  unansweredCount    Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([tenantId, examId])
+  @@index([examId, score])
+  @@index([studentId])
+}
+
+// ---------------------------------------------------------------------------
+// AI module — Phase 8
+// Provider-agnostic usage log + per-output feedback + student study-plan cache
+// + pgvector embeddings for RAG (populated by embedding worker).
+// ---------------------------------------------------------------------------
+
+model AiUsage {
+  id                String   @id @default(cuid())
+  tenantId          String
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  feature           String   // "student.studyPlan", "teacher.generateQuestions", ...
+  provider          String   // "openai" | "anthropic" | "heuristic"
+  model             String
+  promptTokens      Int      @default(0)
+  completionTokens  Int      @default(0)
+  costCents         Float    @default(0)
+  latencyMs         Int      @default(0)
+  outputId          String?  @unique // referenced by AiFeedback
+  createdAt         DateTime @default(now())
+
+  feedback AiFeedback?
+
+  @@index([tenantId, feature, createdAt])
+  @@index([tenantId, createdAt])
+}
+
+model AiFeedback {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  outputId  String   @unique
+  usage     AiUsage? @relation(fields: [outputId], references: [outputId], onDelete: SetNull)
+  thumbsUp  Boolean
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+}
+
+model StudentStudyPlan {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  studentId String
+  student   User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  week      Int      @default(1)
+  topics    String[] @default([])
+  tasks     String[] @default([])
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, studentId, createdAt])
+}
+
+/// pgvector embeddings for RAG over questions / explanations / syllabus docs.
+/// Populated by a BullMQ embedding worker (Phase 8 follow-up); the column is
+/// declared as `Unsupported("vector(1536)")` because Prisma has no native type.
+model Embedding {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sourceType String   // "question" | "explanation" | "syllabus"
+  sourceId   String
+  model      String   // e.g. "text-embedding-3-small"
+  vector     Unsupported("vector(1536)")?
+  createdAt  DateTime @default(now())
+
+  @@unique([tenantId, sourceType, sourceId, model])
+  @@index([tenantId, sourceType])
+}
+
+// ---------------------------------------------------------------------------
+// Subscription & Billing — Phase 9
+// Plans are seeded (not tenant-scoped). Subscription is 1:1 with Tenant.
+// Payment-provider integration is behind an abstraction — the actual Razorpay/
+// Stripe wire-up lands in a follow-up when credentials + webhook infra are up.
+// ---------------------------------------------------------------------------
+
+enum PlanTier {
+  FREE
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+enum PlanInterval {
+  MONTHLY
+  YEARLY
+}
+
+model Plan {
+  id            String       @id @default(cuid())
+  tier          PlanTier
+  name          String
+  priceCents    Int          @default(0) // in the plan's `currency`
+  currency      String       @default("INR")
+  interval      PlanInterval @default(MONTHLY)
+  features      String[]     @default([])
+  // Limits JSON: { students: number, exams: number, aiCredits: number, storageMb: number }
+  // Kept as JSON (vs typed columns) so we can tune limits per-plan without a migration.
+  limits        Json         @default("{}")
+  isPublic      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  subscriptions Subscription[]
+
+  @@unique([tier, interval])
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  TRIALING
+  INCOMPLETE
+}
+
+model Subscription {
+  id                  String             @id @default(cuid())
+  tenantId            String             @unique
+  tenant              Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  planId              String
+  plan                Plan               @relation(fields: [planId], references: [id], onDelete: Restrict)
+  status              SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart  DateTime           @default(now())
+  currentPeriodEnd    DateTime
+  cancelAtPeriodEnd   Boolean            @default(false)
+  couponId            String?
+  coupon              Coupon?            @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  provider            String?            // "stripe" | "razorpay" | null (free)
+  providerCustomerId  String?
+  providerSubId       String?
+  // Dunning state — populated when a payment fails. Reset on successful retry
+  // or on plan change via override / upgrade.
+  dunningAttempts     Int                @default(0)
+  dunningStartedAt    DateTime?
+  lastDunningRunAt    DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@index([status])
+  @@index([currentPeriodEnd])
+}
+
+enum InvoiceStatus {
+  DRAFT
+  OPEN
+  PAID
+  VOID
+  UNCOLLECTIBLE
+}
+
+model Invoice {
+  id             String        @id @default(cuid())
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  amountCents    Int
+  currency       String        @default("INR")
+  status         InvoiceStatus @default(OPEN)
+  paidAt         DateTime?
+  periodStart    DateTime?
+  periodEnd      DateTime?
+  providerRef    String?       // Stripe invoice id / Razorpay order id
+  gstNumber      String?
+  gstRateBps     Int?          // e.g. 1800 = 18%
+  downloadUrl    String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([tenantId, createdAt])
+  @@index([status])
+}
+
+model Coupon {
+  id             String   @id @default(cuid())
+  code           String   @unique
+  percentOff     Int      @default(0) // 0-100
+  amountOffCents Int?     // absolute discount alternative
+  maxRedemptions Int?
+  redeemedCount  Int      @default(0)
+  expiresAt      DateTime?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  subscriptions Subscription[]
+
+  @@index([isActive, expiresAt])
+}
+
+/// Global feature flag — platform-wide toggle managed from the super-admin
+/// console. Not tenant-scoped; evaluate at call sites using the key.
+model FeatureFlag {
+  id                String   @id @default(cuid())
+  key               String   @unique
+  description       String   @default("")
+  enabled           Boolean  @default(false)
+  rolloutPercentage Int      @default(100) // 0-100
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}

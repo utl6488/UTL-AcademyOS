@@ -1,0 +1,12 @@
+node_modules/
+dist/
+build/
+coverage/
+.next/
+.vite/
+.turbo/
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+.github/
+CHANGELOG.md
