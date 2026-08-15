@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  BookOpen,
   Brain,
   Building2,
   ChevronLeft,
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
+import { APP_NAME, Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import type { Role } from "@/lib/auth";
@@ -42,7 +44,13 @@ const mainNav: NavItem[] = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
   { label: "Institute", href: "/institute", icon: Building2, roles: OWNER_ADMIN },
   { label: "Users", href: "/users", icon: Users, roles: OWNER_ADMIN_TEACHER },
-  { label: "Organization", href: "/org", icon: FolderTree, roles: OWNER_ADMIN },
+  { label: "Organization", href: "/org/branches", icon: FolderTree, roles: OWNER_ADMIN },
+  {
+    label: "Subjects & Topics",
+    href: "/org/subjects",
+    icon: BookOpen,
+    roles: OWNER_ADMIN_TEACHER,
+  },
   {
     label: "Question Bank",
     href: "/questions",
@@ -86,8 +94,11 @@ export function Sidebar({ open, onToggle }: SidebarProps) {
       {/* Logo */}
       <div className="flex h-16 items-center justify-between px-4">
         {open && (
-          <Link to="/" className="text-lg font-bold text-sidebar-primary">
-            UTL ExamPro
+          <Link to="/" className="flex items-center gap-2">
+            <Logo className="h-8 w-auto" />
+            <span className="text-base font-bold tracking-tight text-sidebar-primary">
+              {APP_NAME}
+            </span>
           </Link>
         )}
         <Button

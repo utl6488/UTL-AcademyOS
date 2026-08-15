@@ -1,8 +1,10 @@
 import { createHash, randomBytes } from 'node:crypto';
 
 import { type OtpPurpose } from '@prisma/client';
+import { type Role } from '@utl/shared';
 
 import { AppError } from '@/common/errors/index.js';
+import { permissionsFor } from '@/config/constants.js';
 import { env } from '@/config/env.js';
 import { getPrisma, withTenant } from '@/db/prisma.js';
 import { auditFromRequest } from '@/modules/audit/audit.service.js';
@@ -141,7 +143,10 @@ export async function signup(input: SignupInput, meta: RequestMeta) {
 
     return {
       tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug },
-      user: publicUser(user),
+      user: publicUser({
+        ...user,
+        tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug },
+      }),
       tokens: { access, refresh: refresh.token },
     };
   });
@@ -156,7 +161,10 @@ export async function login(input: LoginInput, meta: RequestMeta) {
   const email = input.email.toLowerCase();
 
   return withTenant({ tenantId: '__pending__', bypass: true }, async () => {
-    const user = await prisma.user.findFirst({ where: { email } });
+    const user = await prisma.user.findFirst({
+      where: { email },
+      include: { tenant: { select: { id: true, name: true, slug: true } } },
+    });
     // Uniform failure to prevent user-enumeration timing.
     const bogusHash =
       '$argon2id$v=19$m=19456,t=2,p=1$c29tZXNhbHR4eHh4eHg$LEuY4uV5C2u6D8T8g5fLQMuKvj8jV0YQ';
@@ -389,6 +397,7 @@ function publicUser(u: {
   tenantId: string;
   emailVerifiedAt: Date | null;
   status: string;
+  tenant?: { id: string; name: string; slug: string } | null;
 }) {
   return {
     id: u.id,
@@ -398,5 +407,7 @@ function publicUser(u: {
     tenantId: u.tenantId,
     emailVerified: !!u.emailVerifiedAt,
     status: u.status,
+    tenant: u.tenant ?? undefined,
+    permissions: Array.from(permissionsFor(u.role as Role)),
   };
 }

@@ -1,3 +1,5 @@
+import { getImpersonatedTenantId } from "@/store/tenant-context-store";
+
 import { env } from "./env";
 
 export class ApiError extends Error {
@@ -116,6 +118,9 @@ export async function apiClient<T>(endpoint: string, config: RequestConfig = {})
     ...(customHeaders as Record<string, string> | undefined),
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
+  // Super-admin tenant impersonation: backend `tenantScope` middleware honours this.
+  const impersonatedTenantId = getImpersonatedTenantId();
+  if (impersonatedTenantId) headers["x-tenant-id"] = impersonatedTenantId;
 
   let response = await fetch(url.toString(), { ...restConfig, headers });
 
@@ -139,6 +144,14 @@ export async function apiClient<T>(endpoint: string, config: RequestConfig = {})
     throw new ApiError(response.status, "UNKNOWN_ERROR", `Request failed (${response.status})`);
   }
 
+  // Paginated responses keep the envelope so callers can read meta.
+  // Everything else is unwrapped for convenience.
+  const meta = body.meta as { page?: number; pageSize?: number; total?: number } | undefined;
+  if (meta && meta.page !== undefined && meta.pageSize !== undefined) {
+    const totalPages =
+      meta.total !== undefined ? Math.max(1, Math.ceil(meta.total / meta.pageSize)) : undefined;
+    return { data: body.data, meta: { ...meta, totalPages } } as T;
+  }
   return body.data as T;
 }
 

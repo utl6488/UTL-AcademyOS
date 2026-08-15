@@ -18,6 +18,15 @@ export function withTenant<T>(ctx: TenantContext, fn: () => Promise<T>): Promise
   return tenantAls.run(ctx, fn);
 }
 
+/**
+ * Sync variant of `withTenant` — for Express middleware where we want to wrap
+ * `next()` (which returns void) so the tenant context propagates to all
+ * downstream async handlers via AsyncLocalStorage.
+ */
+export function runWithTenant(ctx: TenantContext, fn: () => void): void {
+  tenantAls.run(ctx, fn);
+}
+
 /** Read the active tenant scope (undefined outside a `withTenant` block). */
 export function currentTenant(): TenantContext | undefined {
   return tenantAls.getStore();
@@ -99,22 +108,39 @@ function injectTenantFilter(params: Prisma.MiddlewareParams, tenantId: string): 
   const args = (params.args ??= {});
 
   switch (action) {
-    case 'findUnique':
+    // Filter-style where inputs — AND wrap is safe and handles OR/AND clauses cleanly.
     case 'findFirst':
     case 'findMany':
     case 'count':
     case 'aggregate':
     case 'groupBy':
-    case 'update':
     case 'updateMany':
-    case 'delete':
     case 'deleteMany':
-    case 'findUniqueOrThrow':
     case 'findFirstOrThrow': {
       args.where = { AND: [{ tenantId }, args.where ?? {}] };
-      // findUnique requires a strict unique key — fall back to findFirst semantics.
-      if (action === 'findUnique') params.action = 'findFirst';
-      if (action === 'findUniqueOrThrow') params.action = 'findFirstOrThrow';
+      break;
+    }
+    // findUnique/findUniqueOrThrow require strict unique keys — downgrade to
+    // findFirst semantics so we can layer the tenant filter with AND.
+    case 'findUnique': {
+      args.where = { AND: [{ tenantId }, args.where ?? {}] };
+      params.action = 'findFirst';
+      break;
+    }
+    case 'findUniqueOrThrow': {
+      args.where = { AND: [{ tenantId }, args.where ?? {}] };
+      params.action = 'findFirstOrThrow';
+      break;
+    }
+    // Unique-where inputs (update/delete/upsert) require the identity field at
+    // top level. Spread tenantId alongside it — Prisma accepts extra filter fields.
+    case 'update':
+    case 'delete':
+    case 'upsert': {
+      args.where = { ...(args.where ?? {}), tenantId };
+      if (action === 'upsert') {
+        args.create = { ...(args.create ?? {}), tenantId };
+      }
       break;
     }
     case 'create': {
@@ -126,11 +152,6 @@ function injectTenantFilter(params: Prisma.MiddlewareParams, tenantId: string): 
         ? args.data
         : [args.data];
       args.data = rows.map((r) => ({ ...r, tenantId: r.tenantId ?? tenantId }));
-      break;
-    }
-    case 'upsert': {
-      args.where = { AND: [{ tenantId }, args.where ?? {}] };
-      args.create = { ...(args.create ?? {}), tenantId };
       break;
     }
     default:

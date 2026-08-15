@@ -74,7 +74,7 @@ export const launchToken = asyncHandler(async (req, res: Response) => {
   const attemptId = paramId(req, 'id');
   ok(res, {
     launchToken: 'STUB',
-    deepLink: `utl-exampro://launch?attemptId=${attemptId}`,
+    deepLink: `utl-academyos://launch?attemptId=${attemptId}`,
     note: 'secure-browser-stub',
   });
 });

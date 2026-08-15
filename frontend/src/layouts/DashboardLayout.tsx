@@ -1,6 +1,7 @@
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
+import { ImpersonationBanner } from "@/components/layout/impersonation-banner";
 import { useState } from "react";
 
 export function DashboardLayout() {
@@ -11,6 +12,7 @@ export function DashboardLayout() {
       <Sidebar open={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
+        <ImpersonationBanner />
         <main className="flex-1 overflow-y-auto p-6">
           <Outlet />
         </main>

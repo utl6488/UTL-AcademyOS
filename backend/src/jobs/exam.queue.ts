@@ -1,9 +1,9 @@
 import { QueueName, getQueue } from './queues.js';
 
-// "exam:notify" carries exam-publish-side-effect fanout (email students +
-// pre-warm cache). Kept separate from `exam:autosubmit` (Phase 6) so failures
+// "exam-notify" carries exam-publish-side-effect fanout (email students +
+// pre-warm cache). Kept separate from `exam-autosubmit` (Phase 6) so failures
 // on one don't block the other.
-const EXAM_NOTIFY_QUEUE_NAME = 'exam:notify' as const;
+const EXAM_NOTIFY_QUEUE_NAME = 'exam-notify' as const;
 
 type LocalQueueName = QueueName | typeof EXAM_NOTIFY_QUEUE_NAME;
 

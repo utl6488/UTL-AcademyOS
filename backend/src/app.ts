@@ -113,6 +113,8 @@ export function createApp(): Express {
   v1.use('/billing', billingRouter);
   v1.use('/admin', adminRouter);
   app.use('/api/v1', v1);
+  // Also mount unversioned /api/* as an alias so clients that omit /v1 work.
+  app.use('/api', v1);
 
   // 404 + error handler must be last.
   app.use(notFoundHandler);

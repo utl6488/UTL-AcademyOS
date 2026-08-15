@@ -135,12 +135,16 @@ function toDetail(e: ExamRels) {
 // Public API
 // ---------------------------------------------------------------------------
 
-export async function listExams(query: ExamListQuery) {
+export async function listExams(query: ExamListQuery, opts: { role?: string } = {}) {
   const where: Prisma.ExamWhereInput = {};
   if (query.status) where.status = STATUS_TO_DB[query.status];
   if (query.mode) where.mode = query.mode;
   if (query.search) {
     where.title = { contains: query.search, mode: 'insensitive' };
+  }
+  // Students should never see draft exams — they're author-only until published.
+  if (opts.role === 'STUDENT') {
+    where.status = { in: ['SCHEDULED', 'LIVE', 'COMPLETED'] };
   }
 
   const orderBy: Prisma.ExamOrderByWithRelationInput = { [query.sortBy]: query.sortOrder };

@@ -4,7 +4,7 @@ import * as swaggerUi from 'swagger-ui-express';
 const spec = {
   openapi: '3.1.0',
   info: {
-    title: 'UTL-ExamPro API',
+    title: 'UTL-AcademyOS API',
     version: '0.1.0',
     description:
       'Multi-tenant AI-powered examination SaaS. All tenant-scoped requests require a Bearer JWT.',

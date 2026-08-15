@@ -7,9 +7,9 @@ export const QueueName = {
   EMAIL: 'email',
   EMBEDDING: 'embedding',
   EVALUATION: 'evaluation',
-  EXAM_AUTOSUBMIT: 'exam:autosubmit',
-  DUNNING: 'billing:dunning',
-  INSTITUTE_DIGEST: 'insights:weekly-digest',
+  EXAM_AUTOSUBMIT: 'exam-autosubmit',
+  DUNNING: 'billing-dunning',
+  INSTITUTE_DIGEST: 'insights-weekly-digest',
 } as const;
 export type QueueName = (typeof QueueName)[keyof typeof QueueName];
 

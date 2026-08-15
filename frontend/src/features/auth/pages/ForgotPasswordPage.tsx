@@ -3,6 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Mail } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,7 +31,8 @@ export default function ForgotPasswordPage() {
   if (isSuccess) {
     return (
       <Card>
-        <CardHeader>
+        <CardHeader className="items-center space-y-2 text-center">
+          <Logo showName className="h-16 w-auto" />
           <div className="mb-4 flex justify-center">
             <div className="rounded-full bg-primary/10 p-3">
               <Mail className="h-6 w-6 text-primary" />
@@ -59,7 +61,8 @@ export default function ForgotPasswordPage() {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="items-center space-y-2 text-center">
+        <Logo showName className="h-16 w-auto" />
         <CardTitle>Forgot password</CardTitle>
         <CardDescription>Enter your email and we'll send you a password reset link</CardDescription>
       </CardHeader>

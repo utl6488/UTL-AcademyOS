@@ -96,7 +96,7 @@ export type Subject = z.infer<typeof subjectSchema>;
 export const subjectFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").max(100),
   code: z.string().max(20).optional(),
-  classIds: z.array(z.string()).min(1, "At least one class is required"),
+  classIds: z.array(z.string()).default([]),
 });
 
 export type SubjectFormValues = z.infer<typeof subjectFormSchema>;

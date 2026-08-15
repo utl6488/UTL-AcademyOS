@@ -25,6 +25,7 @@ import {
   useUnpublishExamMutation,
 } from "../api/mutations";
 import { formatDateTime } from "@/lib/format";
+import { useAuthStore } from "@/store/auth-store";
 import type { ExamListItem, ExamStatus } from "../schemas/exam-schemas";
 
 const STATUS_BADGE: Record<
@@ -42,6 +43,8 @@ export default function ExamListPage() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<string>("all");
   const statusFilter = tab === "all" ? undefined : (tab as ExamStatus);
+
+  const canManage = useAuthStore((s) => s.hasPermission("exam:manage"));
 
   const { data, isLoading, isError, refetch } = useExams({ status: statusFilter });
   const deleteMutation = useDeleteExamMutation();
@@ -113,28 +116,35 @@ export default function ExamListPage() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => navigate(`/exams/${row.original.id}`)}>
-              {row.original.status === "draft" ? "Edit" : "View Details"}
+              {canManage && row.original.status === "draft" ? "Edit" : "View Details"}
             </DropdownMenuItem>
-            {row.original.status === "live" && row.original.mode === "SYNCHRONOUS" && (
+            {row.original.status === "live" && row.original.mode === "SYNCHRONOUS" && canManage && (
               <DropdownMenuItem onClick={() => navigate(`/exams/${row.original.id}/live-console`)}>
                 Live Console
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem onClick={() => duplicateMutation.mutate(row.original.id)}>
-              Duplicate
-            </DropdownMenuItem>
-            {(row.original.status === "scheduled" || row.original.status === "live") && (
-              <DropdownMenuItem onClick={() => unpublishMutation.mutate(row.original.id)}>
-                Unpublish
+            {canManage && (
+              <DropdownMenuItem onClick={() => duplicateMutation.mutate(row.original.id)}>
+                Duplicate
               </DropdownMenuItem>
             )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive"
-              onClick={() => setDeleting(row.original)}
-            >
-              Delete
-            </DropdownMenuItem>
+            {canManage &&
+              (row.original.status === "scheduled" || row.original.status === "live") && (
+                <DropdownMenuItem onClick={() => unpublishMutation.mutate(row.original.id)}>
+                  Unpublish
+                </DropdownMenuItem>
+              )}
+            {canManage && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={() => setDeleting(row.original)}
+                >
+                  Delete
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       ),
@@ -150,18 +160,22 @@ export default function ExamListPage() {
     <div className="space-y-6">
       <PageHeader
         title="Exams"
-        description="Create, schedule, and manage exams"
+        description={
+          canManage ? "Create, schedule, and manage exams" : "View exams assigned to you"
+        }
         actions={
-          <Button onClick={() => navigate("/exams/new")}>
-            <Plus className="mr-2 h-4 w-4" /> Create Exam
-          </Button>
+          canManage ? (
+            <Button onClick={() => navigate("/exams/new")}>
+              <Plus className="mr-2 h-4 w-4" /> Create Exam
+            </Button>
+          ) : null
         }
       />
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="draft">Draft</TabsTrigger>
+          {canManage && <TabsTrigger value="draft">Draft</TabsTrigger>}
           <TabsTrigger value="scheduled">Scheduled</TabsTrigger>
           <TabsTrigger value="live">Live</TabsTrigger>
           <TabsTrigger value="completed">Completed</TabsTrigger>
@@ -172,9 +186,15 @@ export default function ExamListPage() {
             <EmptyState
               icon={ClipboardList}
               title={tab === "all" ? "No exams yet" : `No ${tab} exams`}
-              description={tab === "all" ? "Create your first exam to get started" : undefined}
-              action={
+              description={
                 tab === "all"
+                  ? canManage
+                    ? "Create your first exam to get started"
+                    : "You'll see exams here once your instructor publishes them."
+                  : undefined
+              }
+              action={
+                canManage && tab === "all"
                   ? { label: "Create Exam", onClick: () => navigate("/exams/new") }
                   : undefined
               }

@@ -15,8 +15,8 @@ export const me = asyncHandler(async (req: Request, res: Response) => {
   if (!req.auth) throw AppError.unauthorized();
   const { userId, tenantId } = req.auth;
 
-  const user = await withTenant({ tenantId }, () =>
-    getPrisma().user.findFirst({
+  const user = await withTenant({ tenantId }, async () => {
+    return await getPrisma().user.findFirst({
       where: { id: userId },
       select: {
         id: true,
@@ -29,8 +29,8 @@ export const me = asyncHandler(async (req: Request, res: Response) => {
         lastLoginAt: true,
         tenant: { select: { id: true, name: true, slug: true } },
       },
-    }),
-  );
+    });
+  });
   if (!user) throw AppError.notFound('User not found');
 
   ok(res, {

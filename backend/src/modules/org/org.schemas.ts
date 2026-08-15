@@ -63,7 +63,8 @@ export const BatchUpdateSchema = BatchCreateSchema.partial();
 export const SubjectCreateSchema = z.object({
   name: z.string().min(2).max(100),
   code: z.string().max(20).optional(),
-  classIds: z.array(z.string()).min(1, 'At least one class is required'),
+  // Classes are optional at create time — a subject can be linked to classes later.
+  classIds: z.array(z.string()).default([]),
 });
 export const SubjectUpdateSchema = SubjectCreateSchema.partial();
 

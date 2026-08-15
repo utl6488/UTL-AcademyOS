@@ -1,9 +1,9 @@
-# UTL-ExamPro root Makefile
+# UTL-AcademyOS root Makefile
 # Convenience wrappers around npm + docker compose.
 
 COMPOSE = docker compose -f docker-compose.dev.yml
 
-.PHONY: help install dev dev-up dev-down dev-logs dev-reset build lint typecheck test format \
+.PHONY: help install start dev dev-up dev-down dev-logs dev-reset build lint typecheck test format \
         db-migrate db-seed db-reset clean
 
 help: ## Show this help
@@ -13,6 +13,9 @@ install: ## Install workspace dependencies
 	npm install
 
 # --- Dev servers ------------------------------------------------------------
+
+start: ## Boot everything (docker + migrate + seed + backend + frontend)
+	./scripts/dev.sh
 
 dev: ## Run frontend dev server (assumes docker stack is up)
 	npm run dev

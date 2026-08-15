@@ -2,6 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,7 +32,8 @@ export default function LoginPage() {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="items-center space-y-2 text-center">
+        <Logo showName className="h-16 w-auto" />
         <CardTitle>Sign in</CardTitle>
         <CardDescription>Enter your credentials to access your account</CardDescription>
       </CardHeader>

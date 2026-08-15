@@ -33,6 +33,7 @@ import {
   type ExamScheduleStepValues,
 } from "../schemas/exam-schemas";
 import { cn } from "@/lib/utils";
+import { QuestionPickerDialog } from "../components/QuestionPickerDialog";
 
 type WizardStep = "details" | "sections" | "questions" | "schedule" | "proctoring" | "review";
 
@@ -94,14 +95,28 @@ export default function ExamBuilderPage() {
     setCurrentStep(STEPS[prevIndex].key);
   }
 
-  async function handlePublish() {
+  // `<input type="datetime-local">` returns `YYYY-MM-DDTHH:mm` (no seconds, no tz).
+  // Backend Zod schema requires ISO 8601 with offset — convert here.
+  function toIso(v?: string | null): string | undefined {
+    if (!v) return undefined;
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? undefined : d.toISOString();
+  }
+
+  function buildPayload() {
     const details = detailsForm.getValues();
-    const payload = {
+    return {
       ...details,
       sections,
       ...schedule,
+      startAt: toIso(schedule.startAt),
+      endAt: toIso(schedule.endAt),
       proctoring,
     };
+  }
+
+  async function handlePublish() {
+    const payload = buildPayload();
 
     if (isEditing && id) {
       await updateMutation.mutateAsync({ id, ...payload });
@@ -116,13 +131,7 @@ export default function ExamBuilderPage() {
   }
 
   async function handleSaveDraft() {
-    const details = detailsForm.getValues();
-    const payload = {
-      ...details,
-      sections,
-      ...schedule,
-      proctoring,
-    };
+    const payload = buildPayload();
 
     if (isEditing && id) {
       await updateMutation.mutateAsync({ id, ...payload });
@@ -373,65 +382,94 @@ function QuestionsStep({
   sections: ExamSection[];
   onChange: (s: ExamSection[]) => void;
 }) {
+  const [pickerFor, setPickerFor] = useState<number | null>(null);
+
+  function removeQuestion(sIndex: number, questionId: string) {
+    const updated = [...sections];
+    updated[sIndex] = {
+      ...updated[sIndex],
+      questions: updated[sIndex].questions
+        .filter((q) => q.questionId !== questionId)
+        .map((q, i) => ({ ...q, order: i })),
+    };
+    onChange(updated);
+  }
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">Questions</CardTitle>
-        <CardDescription>
-          Add questions from the question bank to each section. You can reorder and override marks.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {sections.map((section, sIndex) => (
-          <div key={section.id} className="space-y-3 rounded-md border p-4">
-            <h4 className="font-medium">{section.title}</h4>
-            {section.questions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No questions added yet</p>
-            ) : (
-              <div className="space-y-2">
-                {section.questions.map((q, qIndex) => (
-                  <div
-                    key={q.questionId}
-                    className="flex items-center gap-3 rounded bg-muted/50 p-2 text-sm"
-                  >
-                    <span className="text-muted-foreground">{qIndex + 1}.</span>
-                    <span className="flex-1 truncate">{q.questionText || q.questionId}</span>
-                    {q.questionType && (
-                      <Badge variant="outline" className="text-xs">
-                        {q.questionType}
-                      </Badge>
-                    )}
-                    <span className="text-muted-foreground">{q.marks} marks</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                // In real implementation this opens a question picker drawer
-                const mockQuestion = {
-                  questionId: crypto.randomUUID(),
-                  questionText: "Sample question (picker coming soon)",
-                  questionType: "MCQ",
-                  marks: 1,
-                  order: section.questions.length,
-                };
-                const updated = [...sections];
-                updated[sIndex] = {
-                  ...updated[sIndex],
-                  questions: [...section.questions, mockQuestion],
-                };
-                onChange(updated);
-              }}
-            >
-              Add Questions from Bank
-            </Button>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Questions</CardTitle>
+          <CardDescription>
+            Add questions from the question bank to each section. You can reorder and override
+            marks.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {sections.map((section, sIndex) => (
+            <div key={section.id} className="space-y-3 rounded-md border p-4">
+              <h4 className="font-medium">{section.title}</h4>
+              {section.questions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No questions added yet</p>
+              ) : (
+                <div className="space-y-2">
+                  {section.questions.map((q, qIndex) => (
+                    <div
+                      key={q.questionId}
+                      className="flex items-center gap-3 rounded bg-muted/50 p-2 text-sm"
+                    >
+                      <span className="text-muted-foreground">{qIndex + 1}.</span>
+                      <span className="flex-1 truncate">{q.questionText || q.questionId}</span>
+                      {q.questionType && (
+                        <Badge variant="outline" className="text-xs">
+                          {q.questionType}
+                        </Badge>
+                      )}
+                      <span className="text-muted-foreground">{q.marks} marks</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive"
+                        onClick={() => removeQuestion(sIndex, q.questionId)}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <Button variant="outline" size="sm" onClick={() => setPickerFor(sIndex)}>
+                Add Questions from Bank
+              </Button>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <QuestionPickerDialog
+        open={pickerFor !== null}
+        onOpenChange={(o) => {
+          if (!o) setPickerFor(null);
+        }}
+        excludeIds={
+          pickerFor !== null ? sections[pickerFor]?.questions.map((q) => q.questionId) : []
+        }
+        onConfirm={(picked) => {
+          if (pickerFor === null) return;
+          const updated = [...sections];
+          const existing = updated[pickerFor].questions;
+          updated[pickerFor] = {
+            ...updated[pickerFor],
+            questions: [
+              ...existing,
+              ...picked.map((p, i) => ({ ...p, order: existing.length + i })),
+            ],
+          };
+          onChange(updated);
+          setPickerFor(null);
+        }}
+      />
+    </>
   );
 }
 

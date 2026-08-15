@@ -2,7 +2,7 @@
   "name": "@utl/backend",
   "version": "0.1.0",
   "private": true,
-  "description": "UTL-ExamPro backend API (Express + Prisma + BullMQ + Socket.io).",
+  "description": "UTL-AcademyOS backend API (Express + Prisma + BullMQ + Socket.io).",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {

@@ -2,7 +2,7 @@
   "name": "@utl/shared",
   "version": "0.1.0",
   "private": true,
-  "description": "Shared TypeScript types, Zod schemas, and enums for UTL-ExamPro.",
+  "description": "Shared TypeScript types, Zod schemas, and enums for UTL-AcademyOS.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

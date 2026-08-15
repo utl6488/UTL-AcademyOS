@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useTheme } from "@/components/theme-provider";
+import { TenantSwitcher } from "@/components/layout/tenant-switcher";
 import { useAuthStore } from "@/store/auth-store";
 import { useLogoutMutation } from "@/features/auth/api/mutations";
 import { useNavigate } from "react-router-dom";
@@ -46,6 +47,9 @@ export function Header({ onMenuClick }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Super-admin tenant switcher */}
+        <TenantSwitcher />
+
         {/* Theme toggle */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

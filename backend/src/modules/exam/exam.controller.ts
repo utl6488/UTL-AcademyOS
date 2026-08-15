@@ -29,7 +29,7 @@ function paramId(req: Request, key: string): string {
 
 export const list = asyncHandler(async (req, res: Response) => {
   const query = ExamListQuerySchema.parse(req.query);
-  const result = await service.listExams(query);
+  const result = await service.listExams(query, { role: req.auth?.role });
   paginated(res, result.data, result.meta.page, result.meta.pageSize, result.meta.total);
 });
 

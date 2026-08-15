@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useSearchParams, Link, Navigate } from "react-router-dom";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { useVerifyEmailMutation } from "../api/mutations";
 
@@ -24,7 +25,8 @@ export default function VerifyEmailPage() {
   if (isPending) {
     return (
       <Card>
-        <CardHeader>
+        <CardHeader className="items-center space-y-2 text-center">
+          <Logo showName className="h-16 w-auto" />
           <div className="mb-4 flex justify-center">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
           </div>
@@ -40,7 +42,8 @@ export default function VerifyEmailPage() {
   if (isSuccess) {
     return (
       <Card>
-        <CardHeader>
+        <CardHeader className="items-center space-y-2 text-center">
+          <Logo showName className="h-16 w-auto" />
           <div className="mb-4 flex justify-center">
             <div className="rounded-full bg-success/10 p-3">
               <CheckCircle className="h-8 w-8 text-success" />
@@ -63,7 +66,8 @@ export default function VerifyEmailPage() {
   if (isError) {
     return (
       <Card>
-        <CardHeader>
+        <CardHeader className="items-center space-y-2 text-center">
+          <Logo showName className="h-16 w-auto" />
           <div className="mb-4 flex justify-center">
             <div className="rounded-full bg-destructive/10 p-3">
               <XCircle className="h-8 w-8 text-destructive" />

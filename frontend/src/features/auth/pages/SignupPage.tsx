@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Logo } from "@/components/logo";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -38,9 +39,10 @@ export default function SignupPage() {
 
   return (
     <Card className="mx-auto max-w-lg">
-      <CardHeader>
+      <CardHeader className="items-center space-y-2 text-center">
+        <Logo showName className="h-16 w-auto" />
         <CardTitle>Create an account</CardTitle>
-        <CardDescription>Register your institute to get started with UTL ExamPro</CardDescription>
+        <CardDescription>Register your institute to get started with UTL AcademyOS</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

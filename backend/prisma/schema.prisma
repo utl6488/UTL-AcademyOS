@@ -1,4 +1,4 @@
-// UTL-ExamPro — baseline schema (Phase 1).
+// UTL-AcademyOS — baseline schema (Phase 1).
 // Multi-tenant strategy: shared DB, shared schema, `tenantId` column on every
 // tenant-scoped table + composite indexes leading with `tenantId`.
 

@@ -3,7 +3,7 @@ import { z } from "zod";
 const envSchema = z.object({
   VITE_API_BASE_URL: z.string().url(),
   VITE_SOCKET_URL: z.string().url(),
-  VITE_APP_NAME: z.string().default("UTL ExamPro"),
+  VITE_APP_NAME: z.string().default("UTL AcademyOS"),
   VITE_SENTRY_DSN: z.string().optional(),
   VITE_POSTHOG_KEY: z.string().optional(),
   VITE_STRIPE_PUBLIC_KEY: z.string().optional(),

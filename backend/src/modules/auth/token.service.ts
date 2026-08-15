@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 
 import type { Role } from '@utl/shared';
 import * as jwt from 'jsonwebtoken';
-import { type SignOptions, type JwtPayload } from 'jsonwebtoken';
+import type { SignOptions, JwtPayload } from 'jsonwebtoken';
 import { nanoid } from 'nanoid';
 
 import { AppError } from '@/common/errors/index.js';
@@ -52,7 +52,8 @@ export function verifyAccessToken(token: string): AccessTokenPayload & JwtPayloa
 }
 
 function signRefreshToken(claims: RefreshTokenClaims): string {
-  return jwt.sign(claims, env.JWT_REFRESH_SECRET, { ...REFRESH_OPTS, jwtid: claims.jti });
+  // `claims.jti` is already in the payload; passing `jwtid` here too is rejected by jsonwebtoken v9.
+  return jwt.sign(claims, env.JWT_REFRESH_SECRET, REFRESH_OPTS);
 }
 
 function verifyRefreshToken(token: string): RefreshTokenClaims & JwtPayload {

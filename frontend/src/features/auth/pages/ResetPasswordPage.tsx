@@ -2,6 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSearchParams, Link, Navigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,7 +40,8 @@ export default function ResetPasswordPage() {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="items-center space-y-2 text-center">
+        <Logo showName className="h-16 w-auto" />
         <CardTitle>Reset password</CardTitle>
         <CardDescription>Enter your new password below</CardDescription>
       </CardHeader>

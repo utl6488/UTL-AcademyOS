@@ -11,7 +11,7 @@ interface Payload {
 export function sendVerificationEmail(p: Payload): Promise<void> {
   return enqueueEmail({
     to: p.to,
-    subject: 'Verify your UTL-ExamPro email',
+    subject: 'Verify your UTL-AcademyOS email',
     text: `Hi ${p.name ?? 'there'},\n\nConfirm your email:\n${p.link}\n\nThis link expires in 24 hours.`,
     html: renderTemplate('Verify your email', p.name, 'Verify email', p.link),
   }).then(() => {
@@ -22,7 +22,7 @@ export function sendVerificationEmail(p: Payload): Promise<void> {
 export function sendPasswordResetEmail(p: Payload): Promise<void> {
   return enqueueEmail({
     to: p.to,
-    subject: 'Reset your UTL-ExamPro password',
+    subject: 'Reset your UTL-AcademyOS password',
     text: `Hi ${p.name ?? 'there'},\n\nReset your password:\n${p.link}\n\nThis link expires in 30 minutes.`,
     html: renderTemplate('Reset your password', p.name, 'Reset password', p.link),
   }).then(() => {
@@ -33,7 +33,7 @@ export function sendPasswordResetEmail(p: Payload): Promise<void> {
 export function sendInviteEmail(p: Payload & { role: string }): Promise<void> {
   return enqueueEmail({
     to: p.to,
-    subject: `You're invited to UTL-ExamPro as ${p.role}`,
+    subject: `You're invited to UTL-AcademyOS as ${p.role}`,
     text: `You've been invited as ${p.role}.\n\nAccept:\n${p.link}\n\nExpires in 7 days.`,
     html: renderTemplate(`Invitation — ${p.role}`, p.name, 'Accept invite', p.link),
   }).then(() => {

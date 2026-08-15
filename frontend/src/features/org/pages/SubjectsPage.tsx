@@ -21,7 +21,7 @@ import { EmptyState } from "@/components/feedback/empty-state";
 import { LoadingSkeleton } from "@/components/feedback/loading-skeleton";
 import { ErrorState } from "@/components/feedback/error-state";
 import { DataTable } from "@/components/data-table";
-import { useSubjects } from "../api/queries";
+import { useClasses, useSubjects } from "../api/queries";
 import {
   useCreateSubjectMutation,
   useUpdateSubjectMutation,
@@ -44,6 +44,7 @@ const columns: ColumnDef<Subject>[] = [
 export default function SubjectsPage() {
   const navigate = useNavigate();
   const { data: subjects, isLoading, isError, refetch } = useSubjects();
+  const { data: classes } = useClasses();
   const createMutation = useCreateSubjectMutation();
   const updateMutation = useUpdateSubjectMutation();
   const deleteMutation = useDeleteSubjectMutation();
@@ -160,6 +161,49 @@ export default function SubjectsPage() {
                 <Input id="subj-code" placeholder="e.g. MATH" {...form.register("code")} />
               </div>
             </div>
+
+            <div className="space-y-2">
+              <Label>Classes</Label>
+              {(classes ?? []).length === 0 ? (
+                <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+                  No classes yet. Create classes under Organization → Classes first, or leave this
+                  empty and attach classes later.
+                </p>
+              ) : (
+                <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border p-2">
+                  {(classes ?? []).map((cls) => {
+                    const selected = form.watch("classIds") ?? [];
+                    const checked = selected.includes(cls.id);
+                    return (
+                      <label
+                        key={cls.id}
+                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-accent"
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-input accent-primary"
+                          checked={checked}
+                          onChange={(e) => {
+                            const next = e.target.checked
+                              ? [...selected, cls.id]
+                              : selected.filter((id) => id !== cls.id);
+                            form.setValue("classIds", next, { shouldDirty: true });
+                          }}
+                        />
+                        <span className="flex-1">{cls.name}</span>
+                        {cls.branchName && (
+                          <span className="text-xs text-muted-foreground">{cls.branchName}</span>
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Optional. Assign later if you'd rather.
+              </p>
+            </div>
+
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setFormOpen(false)}>
                 Cancel

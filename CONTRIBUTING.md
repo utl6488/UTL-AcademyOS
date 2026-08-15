@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for working on UTL-ExamPro. This document covers the conventions the repo enforces.
+Thanks for working on UTL-AcademyOS. This document covers the conventions the repo enforces.
 
 ## Branching
 

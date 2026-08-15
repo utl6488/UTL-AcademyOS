@@ -84,7 +84,7 @@ export async function runDunningPass(): Promise<{ processed: number; downgraded:
         await enqueueEmail({
           to: owner.email,
           subject: 'Action required: update your billing details',
-          text: `Hi ${owner.name || ''},\n\nYour ${sub.plan.name} subscription for ${sub.tenant.name} could not be renewed after ${attempts} attempts.\nYou have until ${graceEnd.toISOString().slice(0, 10)} to update your payment method before we downgrade you to the Free plan.\n\n— UTL ExamPro`,
+          text: `Hi ${owner.name || ''},\n\nYour ${sub.plan.name} subscription for ${sub.tenant.name} could not be renewed after ${attempts} attempts.\nYou have until ${graceEnd.toISOString().slice(0, 10)} to update your payment method before we downgrade you to the Free plan.\n\n— UTL AcademyOS`,
         }).catch((err: unknown) => logger.warn({ err }, 'dunning: email enqueue failed'));
       }
       await prisma.subscription.update({
@@ -121,7 +121,7 @@ export async function runDunningPass(): Promise<{ processed: number; downgraded:
       await enqueueEmail({
         to: owner.email,
         subject: 'Your subscription has been downgraded to Free',
-        text: `Hi ${owner.name || ''},\n\nAfter ${attempts} failed payment attempts we've moved ${sub.tenant.name} to the Free plan. Upgrade any time from the billing dashboard.\n\n— UTL ExamPro`,
+        text: `Hi ${owner.name || ''},\n\nAfter ${attempts} failed payment attempts we've moved ${sub.tenant.name} to the Free plan. Upgrade any time from the billing dashboard.\n\n— UTL AcademyOS`,
       }).catch((err: unknown) => logger.warn({ err }, 'dunning: downgrade email enqueue failed'));
     }
     downgraded++;

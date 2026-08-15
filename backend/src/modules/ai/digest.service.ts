@@ -283,7 +283,7 @@ function toPlainText(name: string, n: DigestNarrative, m: WeeklyMetrics): string
     `Metrics: ${m.examsConducted} exams · ${m.attemptsSubmitted} attempts · ${m.activeStudents} active students · avg ${m.averageScorePct}%.`,
   );
   lines.push('');
-  lines.push('— UTL-ExamPro');
+  lines.push('— UTL-AcademyOS');
   return lines.join('\n');
 }
 
@@ -297,7 +297,7 @@ function toHtml(name: string, n: DigestNarrative, m: WeeklyMetrics): string {
     `<h3>Risks</h3>${bullets(n.risks)}`,
     `<h3>Focus for next week</h3>${bullets(n.focusNextWeek)}`,
     `<p style="color:#666;font-size:12px">Metrics: ${m.examsConducted} exams · ${m.attemptsSubmitted} attempts · ${m.activeStudents} active students · avg ${m.averageScorePct}%.</p>`,
-    `<p style="color:#999;font-size:12px">— UTL-ExamPro</p>`,
+    `<p style="color:#999;font-size:12px">— UTL-AcademyOS</p>`,
   ].join('');
 }
 

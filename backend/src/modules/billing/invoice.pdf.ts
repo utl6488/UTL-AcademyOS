@@ -42,7 +42,7 @@ export function renderInvoicePdf(input: InvoiceInput): Promise<Buffer> {
       .text(fmtDate(input.createdAt), { align: 'right' })
       .moveDown();
 
-    doc.fillColor('#000').fontSize(16).text('UTL ExamPro', 50, 50);
+    doc.fillColor('#000').fontSize(16).text('UTL AcademyOS', 50, 50);
     doc.fontSize(9).fillColor('#666').text('utl.academy', 50, 72);
 
     doc.moveDown(3);

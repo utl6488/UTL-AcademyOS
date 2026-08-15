@@ -8,6 +8,11 @@ const csv = (raw: string | undefined): string[] =>
     .map((s) => s.trim())
     .filter(Boolean);
 
+// Empty strings from .env files should behave like "not set" so `.optional()` works.
+const emptyToUndefined = (v: unknown) => (v === '' ? undefined : v);
+const optionalUrl = z.preprocess(emptyToUndefined, z.string().url().optional());
+const optionalString = z.preprocess(emptyToUndefined, z.string().optional());
+
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(4000),
@@ -26,10 +31,10 @@ const EnvSchema = z.object({
   JWT_ACCESS_TTL: z.string().default('15m'),
   JWT_REFRESH_TTL: z.string().default('7d'),
 
-  S3_ENDPOINT: z.string().url().optional(),
+  S3_ENDPOINT: optionalUrl,
   S3_REGION: z.string().default('us-east-1'),
-  S3_ACCESS_KEY: z.string().optional(),
-  S3_SECRET_KEY: z.string().optional(),
+  S3_ACCESS_KEY: optionalString,
+  S3_SECRET_KEY: optionalString,
   S3_BUCKET_UPLOADS: z.string().default('utl-uploads'),
   S3_BUCKET_QUESTION_IMAGES: z.string().default('utl-question-images'),
   S3_FORCE_PATH_STYLE: z
@@ -39,13 +44,13 @@ const EnvSchema = z.object({
 
   SMTP_HOST: z.string().default('localhost'),
   SMTP_PORT: z.coerce.number().int().positive().default(1025),
-  SMTP_USER: z.string().optional(),
-  SMTP_PASSWORD: z.string().optional(),
-  SMTP_FROM: z.string().default('UTL-ExamPro <no-reply@utl-exampro.local>'),
+  SMTP_USER: optionalString,
+  SMTP_PASSWORD: optionalString,
+  SMTP_FROM: z.string().default('UTL-AcademyOS <no-reply@utl-academyos.local>'),
 
-  OPENAI_API_KEY: z.string().optional(),
-  ANTHROPIC_API_KEY: z.string().optional(),
-  SENTRY_DSN: z.string().url().optional(),
+  OPENAI_API_KEY: optionalString,
+  ANTHROPIC_API_KEY: optionalString,
+  SENTRY_DSN: optionalUrl,
 
   APP_URL: z.string().url().default('http://localhost:5173'),
 });
