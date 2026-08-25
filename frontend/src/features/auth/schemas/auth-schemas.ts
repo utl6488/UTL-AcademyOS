@@ -47,6 +47,17 @@ export const resetPasswordSchema = z
   });
 export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 
+export const acceptInviteSchema = z
+  .object({
+    password: PasswordSchema,
+    confirmPassword: z.string().min(1, "Please confirm your password"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
+export type AcceptInviteFormValues = z.infer<typeof acceptInviteSchema>;
+
 // ------------------------- API response shapes --------------------------
 
 const RoleSchema = z.enum([

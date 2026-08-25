@@ -20,11 +20,13 @@ function publicUser(u: {
   phone: string | null;
   role: string;
   status: string;
+  tenantId: string;
   classId: string | null;
   branchId: string | null;
   sectionId: string | null;
   lastLoginAt: Date | null;
   createdAt: Date;
+  tenant?: { id: string; name: string } | null;
   class?: { id: string; name: string } | null;
   section?: { id: string; name: string } | null;
   branch?: { id: string; name: string } | null;
@@ -39,6 +41,8 @@ function publicUser(u: {
     phone: u.phone,
     role: u.role,
     status: u.status,
+    tenantId: u.tenantId,
+    tenantName: u.tenant?.name ?? null,
     classId: u.classId,
     className: u.class?.name ?? null,
     sectionId: u.sectionId,
@@ -57,6 +61,7 @@ export async function listUsers(query: UserListQuery) {
   if (query.role) where.role = query.role;
   if (query.status) where.status = query.status;
   if (query.classId) where.classId = query.classId;
+  if (query.tenantId) where.tenantId = query.tenantId;
   if (query.batchId) where.batchMemberships = { some: { batchId: query.batchId } };
   if (query.search) {
     where.OR = [
@@ -77,6 +82,7 @@ export async function listUsers(query: UserListQuery) {
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
       include: {
+        tenant: { select: { id: true, name: true } },
         class: { select: { id: true, name: true } },
         section: { select: { id: true, name: true } },
         branch: { select: { id: true, name: true } },
@@ -104,6 +110,7 @@ export async function getUser(id: string) {
   const u = await getPrisma().user.findFirst({
     where: { id },
     include: {
+      tenant: { select: { id: true, name: true } },
       class: { select: { id: true, name: true } },
       section: { select: { id: true, name: true } },
       branch: { select: { id: true, name: true } },
@@ -132,8 +139,13 @@ export async function inviteUser(tenantId: string, input: InviteUserInput) {
       role: input.role,
       status: 'INVITED' as UserStatus,
       passwordHash,
+      classId: input.role === 'STUDENT' ? (input.classId ?? null) : null,
     },
   });
+
+  if (input.role === 'STUDENT' && input.batchId) {
+    await prisma.batchMember.create({ data: { batchId: input.batchId, userId: user.id } });
+  }
 
   const raw = randomBytes(32).toString('base64url');
   const tokenHash = createHash('sha256').update(raw).digest('hex');
@@ -158,9 +170,25 @@ export async function inviteUser(tenantId: string, input: InviteUserInput) {
 }
 
 export async function updateUser(id: string, patch: UpdateUserInput) {
-  const existing = await getPrisma().user.findFirst({ where: { id } });
+  const prisma = getPrisma();
+  const existing = await prisma.user.findFirst({ where: { id } });
   if (!existing) throw AppError.notFound('User not found');
-  await getPrisma().user.update({ where: { id }, data: patch });
+
+  // batchId lives in a join table, not on the User row — split it out.
+  const { batchId, ...userPatch } = patch;
+
+  await prisma.$transaction(async (tx) => {
+    if (Object.keys(userPatch).length > 0) {
+      await tx.user.update({ where: { id }, data: userPatch });
+    }
+    if (batchId !== undefined) {
+      await tx.batchMember.deleteMany({ where: { userId: id } });
+      if (batchId) {
+        await tx.batchMember.create({ data: { batchId, userId: id } });
+      }
+    }
+  });
+
   return getUser(id);
 }
 

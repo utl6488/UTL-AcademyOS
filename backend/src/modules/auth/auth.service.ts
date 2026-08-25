@@ -9,6 +9,7 @@ import { env } from '@/config/env.js';
 import { getPrisma, withTenant } from '@/db/prisma.js';
 import { auditFromRequest } from '@/modules/audit/audit.service.js';
 import type {
+  AcceptInviteInput,
   ForgotPasswordInput,
   LoginInput,
   ResetPasswordInput,
@@ -326,6 +327,63 @@ export async function forgotPassword(input: ForgotPasswordInput) {
       name: user.name,
       link: `${env.APP_URL}/auth/reset-password?token=${otp.raw}`,
     });
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/* Invite acceptance                                                          */
+/* -------------------------------------------------------------------------- */
+
+export async function acceptInvite(input: AcceptInviteInput, meta: RequestMeta) {
+  const prisma = getPrisma();
+  return withTenant({ tenantId: '__pending__', bypass: true }, async () => {
+    const record = await prisma.otpToken.findUnique({
+      where: { tokenHash: hashTokenValue(input.token) },
+    });
+    if (!record || record.purpose !== 'INVITE' || !record.userId) {
+      throw AppError.badRequest('Invalid invite token');
+    }
+    if (record.usedAt) throw AppError.badRequest('Invite already accepted');
+    if (record.expiresAt.getTime() < Date.now()) throw AppError.badRequest('Invite expired');
+
+    const user = await prisma.user.findFirst({
+      where: { id: record.userId },
+      include: { tenant: { select: { id: true, name: true, slug: true } } },
+    });
+    if (!user) throw AppError.badRequest('Invited user no longer exists');
+
+    const passwordHash = await hashPassword(input.password);
+    await prisma.$transaction([
+      prisma.otpToken.update({ where: { id: record.id }, data: { usedAt: new Date() } }),
+      prisma.user.update({
+        where: { id: user.id },
+        data: {
+          passwordHash,
+          status: 'ACTIVE',
+          emailVerifiedAt: user.emailVerifiedAt ?? new Date(),
+          lastLoginAt: new Date(),
+        },
+      }),
+    ]);
+
+    const refresh = await issueRefreshToken({
+      userId: user.id,
+      tenantId: user.tenantId,
+      role: user.role,
+      userAgent: meta.userAgent,
+      ip: meta.ip,
+    });
+    const access = signAccessToken({
+      sub: user.id,
+      tid: user.tenantId,
+      role: user.role,
+      sid: refresh.familyId,
+    });
+
+    return {
+      user: publicUser({ ...user, status: 'ACTIVE', emailVerifiedAt: new Date() }),
+      tokens: { access, refresh: refresh.token },
+    };
   });
 }
 

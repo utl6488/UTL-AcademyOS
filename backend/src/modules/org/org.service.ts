@@ -7,8 +7,23 @@ import { getPrisma } from '@/db/prisma.js';
 // Branches
 // ---------------------------------------------------------------------------
 
-export function listBranches() {
-  return getPrisma().branch.findMany({ orderBy: { name: 'asc' } });
+export async function listBranches(filters: { tenantId?: string } = {}) {
+  const rows = await getPrisma().branch.findMany({
+    where: filters.tenantId ? { tenantId: filters.tenantId } : undefined,
+    include: { tenant: { select: { id: true, name: true } } },
+    orderBy: { name: 'asc' },
+  });
+  return rows.map((b) => ({
+    id: b.id,
+    name: b.name,
+    code: b.code,
+    address: b.address,
+    isActive: b.isActive,
+    tenantId: b.tenantId,
+    tenantName: b.tenant?.name ?? null,
+    createdAt: b.createdAt,
+    updatedAt: b.updatedAt,
+  }));
 }
 
 export async function createBranch(data: Prisma.BranchUncheckedCreateInput) {
@@ -105,10 +120,14 @@ export async function deleteAcademicYear(id: string) {
 // Classes (+ sections)
 // ---------------------------------------------------------------------------
 
-export async function listClasses(filters: { branchId?: string }) {
+export async function listClasses(filters: { branchId?: string; tenantId?: string }) {
+  const where: Prisma.ClassWhereInput = {};
+  if (filters.branchId) where.branchId = filters.branchId;
+  if (filters.tenantId) where.tenantId = filters.tenantId;
   const rows = await getPrisma().class.findMany({
-    where: { branchId: filters.branchId },
+    where,
     include: {
+      tenant: { select: { id: true, name: true } },
       branch: { select: { id: true, name: true } },
       sections: { select: { id: true, name: true }, orderBy: { name: 'asc' } },
     },
@@ -121,6 +140,8 @@ export async function listClasses(filters: { branchId?: string }) {
     branchId: c.branchId,
     branchName: c.branch?.name ?? null,
     sections: c.sections,
+    tenantId: c.tenantId,
+    tenantName: c.tenant?.name ?? null,
     createdAt: c.createdAt,
   }));
 }
@@ -199,10 +220,14 @@ export async function deleteClass(id: string) {
 // Batches
 // ---------------------------------------------------------------------------
 
-export async function listBatches(filters: { classId?: string }) {
+export async function listBatches(filters: { classId?: string; tenantId?: string }) {
+  const where: Prisma.BatchWhereInput = {};
+  if (filters.classId) where.classId = filters.classId;
+  if (filters.tenantId) where.tenantId = filters.tenantId;
   const rows = await getPrisma().batch.findMany({
-    where: { classId: filters.classId },
+    where,
     include: {
+      tenant: { select: { id: true, name: true } },
       class: { select: { id: true, name: true } },
       teacher: { select: { id: true, name: true } },
       _count: { select: { members: true } },
@@ -218,6 +243,8 @@ export async function listBatches(filters: { classId?: string }) {
     teacherName: b.teacher?.name ?? null,
     studentCount: b._count.members,
     isActive: b.isActive,
+    tenantId: b.tenantId,
+    tenantName: b.tenant?.name ?? null,
     createdAt: b.createdAt,
   }));
 }
@@ -304,10 +331,14 @@ export async function deleteBatch(id: string) {
 // Subjects
 // ---------------------------------------------------------------------------
 
-export async function listSubjects(filters: { classId?: string }) {
+export async function listSubjects(filters: { classId?: string; tenantId?: string }) {
+  const where: Prisma.SubjectWhereInput = {};
+  if (filters.classId) where.classes = { some: { id: filters.classId } };
+  if (filters.tenantId) where.tenantId = filters.tenantId;
   const rows = await getPrisma().subject.findMany({
-    where: filters.classId ? { classes: { some: { id: filters.classId } } } : undefined,
+    where,
     include: {
+      tenant: { select: { id: true, name: true } },
       classes: { select: { id: true } },
       _count: { select: { topics: true } },
     },
@@ -319,6 +350,8 @@ export async function listSubjects(filters: { classId?: string }) {
     code: s.code,
     classIds: s.classes.map((c) => c.id),
     topicCount: s._count.topics,
+    tenantId: s.tenantId,
+    tenantName: s.tenant?.name ?? null,
     createdAt: s.createdAt,
   }));
 }

@@ -12,6 +12,7 @@ import { useAuthStore } from "@/store/auth-store";
 import { authResponseSchema } from "../schemas/auth-schemas";
 
 import type {
+  AcceptInviteFormValues,
   ForgotPasswordFormValues,
   LoginFormValues,
   ResetPasswordFormValues,
@@ -92,6 +93,20 @@ export function useResetPasswordMutation() {
       toast.success("Password reset", "Your password has been changed. Please log in.");
       navigate("/auth/login");
     },
+  });
+}
+
+export function useAcceptInviteMutation() {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const setUser = useAuthStore((s) => s.setUser);
+
+  return useMutation({
+    mutationFn: async ({ token, password }: AcceptInviteFormValues & { token: string }) => {
+      const response = await api.post<unknown>("/auth/accept-invite", { token, password });
+      return parseApiResponse(authResponseSchema, response);
+    },
+    onSuccess: (data) => completeAuth(data, queryClient, setUser, navigate, "Welcome aboard!"),
   });
 }
 

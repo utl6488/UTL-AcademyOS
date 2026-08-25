@@ -7,12 +7,25 @@ import {
   leaderboardEntrySchema,
   classReportSchema,
   instituteDashboardSchema,
+  myAttemptSchema,
   type StudentResult,
   type LeaderboardEntry,
   type ClassReport,
   type InstituteDashboard,
+  type MyAttempt,
 } from "../schemas/results-schemas";
 import type { PaginatedResponse } from "@/types";
+
+export function useMyAttempts(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: qk.attempts.mine(),
+    queryFn: async () => {
+      const data = await api.get<MyAttempt[]>("/attempts/mine");
+      return parseApiArrayResponse(myAttemptSchema, data);
+    },
+    enabled: options?.enabled ?? true,
+  });
+}
 
 export function useStudentResult(attemptId: string) {
   return useQuery({

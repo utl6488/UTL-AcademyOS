@@ -18,6 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/layout/page-header";
 import { LoadingSkeleton } from "@/components/feedback/loading-skeleton";
+import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { useExamDetail } from "../api/queries";
 import {
   useCreateExamMutation,
@@ -526,20 +527,21 @@ function ScheduleStep({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="startAt">Start Date/Time</Label>
-            <Input
+            <DateTimePicker
               id="startAt"
-              type="datetime-local"
               value={value.startAt || ""}
-              onChange={(e) => onChange({ ...value, startAt: e.target.value })}
+              onChange={(next) => onChange({ ...value, startAt: next })}
+              placeholder="Choose when the exam opens"
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="endAt">End Date/Time</Label>
-            <Input
+            <DateTimePicker
               id="endAt"
-              type="datetime-local"
               value={value.endAt || ""}
-              onChange={(e) => onChange({ ...value, endAt: e.target.value })}
+              onChange={(next) => onChange({ ...value, endAt: next })}
+              placeholder="Choose when the exam closes"
+              min={value.startAt || undefined}
             />
           </div>
         </div>

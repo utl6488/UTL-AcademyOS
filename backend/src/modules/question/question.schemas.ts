@@ -131,6 +131,7 @@ export const QuestionListQuerySchema = z.object({
     )
     .optional(),
   search: z.string().optional(),
+  tenantId: z.string().optional(),
   sortBy: z.enum(['createdAt', 'updatedAt', 'marks', 'difficulty']).default('createdAt'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
 });

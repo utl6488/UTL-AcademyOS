@@ -27,14 +27,16 @@ export function ProtectedRoute({
     return <Navigate to="/auth/login" state={{ from: location }} replace />;
   }
 
-  if (requiredRole) {
+  const isSuperAdmin = user.role === "SUPER_ADMIN";
+
+  if (requiredRole && !isSuperAdmin) {
     const allowed = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
     if (!allowed.includes(user.role)) {
       return <Navigate to="/403" replace />;
     }
   }
 
-  if (requiredPermission && !user.permissions.includes(requiredPermission)) {
+  if (requiredPermission && !isSuperAdmin && !user.permissions.includes(requiredPermission)) {
     return <Navigate to="/403" replace />;
   }
 

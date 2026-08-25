@@ -12,7 +12,7 @@ type LocalQueueName = QueueName | typeof IMPORT_QUEUE_NAME;
 
 export function enqueueImport(data: ImportJobData) {
   return getQueue(IMPORT_QUEUE_NAME as unknown as LocalQueueName as QueueName).add('run', data, {
-    jobId: `import:${data.jobId}`,
+    jobId: `import-${data.jobId}`,
   });
 }
 

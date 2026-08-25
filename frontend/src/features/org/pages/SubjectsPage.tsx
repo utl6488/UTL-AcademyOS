@@ -9,6 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -29,21 +36,27 @@ import {
 } from "../api/mutations";
 import { subjectFormSchema, type SubjectFormValues, type Subject } from "../schemas/org-schemas";
 import type { ColumnDef } from "@tanstack/react-table";
-
-const columns: ColumnDef<Subject>[] = [
-  { accessorKey: "name", header: "Subject" },
-  { accessorKey: "code", header: "Code", cell: ({ row }) => row.original.code || "—" },
-  { accessorKey: "topicCount", header: "Topics" },
-  {
-    accessorKey: "classIds",
-    header: "Classes",
-    cell: ({ row }) => <Badge variant="secondary">{row.original.classIds.length} class(es)</Badge>,
-  },
-];
+import { useAuthStore } from "@/store/auth-store";
+import { useTenantContextStore } from "@/store/tenant-context-store";
+import { useTenants } from "@/features/admin/api/queries";
 
 export default function SubjectsPage() {
   const navigate = useNavigate();
-  const { data: subjects, isLoading, isError, refetch } = useSubjects();
+  const role = useAuthStore((s) => s.user?.role);
+  const impersonatedTenantId = useTenantContextStore((s) => s.impersonatedTenantId);
+  const isGodView = role === "SUPER_ADMIN" && !impersonatedTenantId;
+
+  const [tenantId, setTenantId] = useState<string | undefined>(undefined);
+
+  const { data: tenantsData } = useTenants({ pageSize: 100 }, { enabled: isGodView });
+  const tenants = tenantsData?.data ?? [];
+
+  const {
+    data: subjects,
+    isLoading,
+    isError,
+    refetch,
+  } = useSubjects(isGodView ? { tenantId } : undefined);
   const { data: classes } = useClasses();
   const createMutation = useCreateSubjectMutation();
   const updateMutation = useUpdateSubjectMutation();
@@ -78,6 +91,28 @@ export default function SubjectsPage() {
     }
   }
 
+  const baseColumns: ColumnDef<Subject>[] = [
+    { accessorKey: "name", header: "Subject" },
+    { accessorKey: "code", header: "Code", cell: ({ row }) => row.original.code || "—" },
+    ...(isGodView
+      ? [
+          {
+            accessorKey: "tenantName",
+            header: "Institute",
+            cell: ({ row }: { row: { original: Subject } }) => row.original.tenantName || "—",
+          } as ColumnDef<Subject>,
+        ]
+      : []),
+    { accessorKey: "topicCount", header: "Topics" },
+    {
+      accessorKey: "classIds",
+      header: "Classes",
+      cell: ({ row }) => (
+        <Badge variant="secondary">{row.original.classIds.length} class(es)</Badge>
+      ),
+    },
+  ];
+
   if (isLoading) return <LoadingSkeleton variant="table" />;
   if (isError) return <ErrorState onRetry={() => refetch()} />;
 
@@ -93,6 +128,24 @@ export default function SubjectsPage() {
         }
       />
 
+      {isGodView && (
+        <div className="flex flex-wrap gap-3">
+          <Select value={tenantId || ""} onValueChange={(v) => setTenantId(v || undefined)}>
+            <SelectTrigger className="w-56">
+              <SelectValue placeholder="All institutes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All institutes</SelectItem>
+              {tenants.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       {subjects?.length === 0 ? (
         <EmptyState
           icon={BookOpen}
@@ -103,7 +156,7 @@ export default function SubjectsPage() {
       ) : (
         <DataTable
           columns={[
-            ...columns,
+            ...baseColumns,
             {
               id: "actions",
               cell: ({ row }) => (

@@ -19,6 +19,7 @@ export interface QuestionFilters extends PaginationParams {
   type?: QuestionType;
   tags?: string[];
   search?: string;
+  tenantId?: string;
   [key: string]: string | number | boolean | string[] | undefined;
 }
 

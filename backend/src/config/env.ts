@@ -20,7 +20,7 @@ const EnvSchema = z.object({
 
   CORS_ORIGINS: z
     .string()
-    .default('http://localhost:5173')
+    .default('http://localhost:3000')
     .transform((v) => csv(v)),
 
   DATABASE_URL: z.string().url().or(z.string().startsWith('postgresql://')),
@@ -52,7 +52,7 @@ const EnvSchema = z.object({
   ANTHROPIC_API_KEY: optionalString,
   SENTRY_DSN: optionalUrl,
 
-  APP_URL: z.string().url().default('http://localhost:5173'),
+  APP_URL: z.string().url().default('http://localhost:3000'),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
@@ -102,7 +102,7 @@ function loadEnvSafe(): Env {
         SMTP_HOST: 'localhost',
         SMTP_PORT: 1025,
         SMTP_FROM: 'test',
-        APP_URL: 'http://localhost:5173',
+        APP_URL: 'http://localhost:3000',
       } as Env;
     }
     throw err;

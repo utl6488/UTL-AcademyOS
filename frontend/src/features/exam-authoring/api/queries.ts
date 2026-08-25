@@ -15,6 +15,7 @@ import type { PaginatedResponse, PaginationParams } from "@/types";
 
 export interface ExamFilters extends PaginationParams {
   status?: ExamStatus;
+  tenantId?: string;
 }
 
 export function useExams(filters: ExamFilters) {

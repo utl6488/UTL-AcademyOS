@@ -16,6 +16,8 @@ interface UserFilters extends PaginationParams {
   classId?: string;
   batchId?: string;
   status?: string;
+  tenantId?: string;
+  search?: string;
 }
 
 export function useUsers(filters: UserFilters) {
@@ -27,20 +29,20 @@ export function useUsers(filters: UserFilters) {
   });
 }
 
-export function useTeachers(filters?: PaginationParams) {
+export function useTeachers(filters?: UserFilters) {
   return useQuery({
-    queryKey: qk.users.list({ ...filters, role: "teacher" }),
+    queryKey: qk.users.list({ ...filters, role: "TEACHER" }),
     queryFn: async () => {
-      return api.get<PaginatedResponse<UserListItem>>("/users", { ...filters, role: "teacher" });
+      return api.get<PaginatedResponse<UserListItem>>("/users", { ...filters, role: "TEACHER" });
     },
   });
 }
 
 export function useStudents(filters?: UserFilters) {
   return useQuery({
-    queryKey: qk.users.list({ ...filters, role: "student" }),
+    queryKey: qk.users.list({ ...filters, role: "STUDENT" }),
     queryFn: async () => {
-      return api.get<PaginatedResponse<UserListItem>>("/users", { ...filters, role: "student" });
+      return api.get<PaginatedResponse<UserListItem>>("/users", { ...filters, role: "STUDENT" });
     },
   });
 }

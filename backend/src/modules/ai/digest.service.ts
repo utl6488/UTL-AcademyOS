@@ -60,7 +60,7 @@ export async function runWeeklyDigestPass(): Promise<{
       });
       if (!owners.length) continue;
 
-      const narrative = await composeNarrative(t.id, metrics);
+      const narrative = await withTenant({ tenantId: t.id }, () => composeNarrative(t.id, metrics));
       for (const o of owners) {
         await enqueueEmail({
           to: o.email,

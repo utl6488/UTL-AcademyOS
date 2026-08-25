@@ -6,15 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LoadingSkeleton } from "@/components/feedback/loading-skeleton";
-import { ErrorState } from "@/components/feedback/error-state";
-import { useNotificationPreferences } from "@/features/notifications/api/queries";
-import { useUpdatePreferencesMutation } from "@/features/notifications/api/mutations";
-import type { NotificationPreference } from "@/features/notifications/schemas/notification-schemas";
-import { useAuth } from "@/features/auth/hooks/use-auth";
+import { useAuthStore } from "@/store/auth-store";
 import { toast } from "@/lib/toast";
 
 export default function SettingsPage() {
+  const role = useAuthStore((s) => s.user?.role);
+  const isStudent = role === "STUDENT";
+
   return (
     <div className="space-y-6">
       <PageHeader title="Settings" description="Manage your account and preferences" />
@@ -23,8 +21,8 @@ export default function SettingsPage() {
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
-          <TabsTrigger value="preferences">Preferences</TabsTrigger>
-          <TabsTrigger value="tenant">Tenant Settings</TabsTrigger>
+          {!isStudent && <TabsTrigger value="preferences">Preferences</TabsTrigger>}
+          {!isStudent && <TabsTrigger value="tenant">Tenant Settings</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="profile" className="mt-6">
@@ -35,13 +33,17 @@ export default function SettingsPage() {
           <SecurityTab />
         </TabsContent>
 
-        <TabsContent value="preferences" className="mt-6">
-          <PreferencesTab />
-        </TabsContent>
+        {!isStudent && (
+          <TabsContent value="preferences" className="mt-6">
+            <PreferencesTab />
+          </TabsContent>
+        )}
 
-        <TabsContent value="tenant" className="mt-6">
-          <TenantTab />
-        </TabsContent>
+        {!isStudent && (
+          <TabsContent value="tenant" className="mt-6">
+            <TenantTab />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
@@ -50,7 +52,7 @@ export default function SettingsPage() {
 // ─── Profile Tab ────────────────────────────────────────────────────────────
 
 function ProfileTab() {
-  const { user } = useAuth();
+  const user = useAuthStore((s) => s.user);
   const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
 
@@ -171,71 +173,20 @@ function SecurityTab() {
 // ─── Preferences Tab ────────────────────────────────────────────────────────
 
 function PreferencesTab() {
-  const { data: preferences, isLoading, isError, refetch } = useNotificationPreferences();
-  const updateMutation = useUpdatePreferencesMutation();
-  const [localPrefs, setLocalPrefs] = useState<NotificationPreference[] | null>(null);
-
-  if (isLoading) return <LoadingSkeleton variant="table" />;
-  if (isError) return <ErrorState onRetry={() => refetch()} />;
-
-  const currentPrefs = localPrefs ?? preferences ?? [];
-
-  const togglePref = (eventType: string, channel: "email" | "inApp") => {
-    const updated = currentPrefs.map((p) =>
-      p.eventType === eventType ? { ...p, [channel]: !p[channel] } : p
-    );
-    setLocalPrefs(updated);
-  };
-
-  const handleSave = () => {
-    updateMutation.mutate(currentPrefs);
-  };
-
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-sm font-medium">Notification Preferences</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="rounded-md border">
-          <div className="grid grid-cols-[1fr,80px,80px] gap-2 border-b px-4 py-2 text-xs font-medium text-muted-foreground">
-            <span>Event</span>
-            <span className="text-center">Email</span>
-            <span className="text-center">In-App</span>
-          </div>
-          {currentPrefs.map((pref) => (
-            <div
-              key={pref.eventType}
-              className="grid grid-cols-[1fr,80px,80px] items-center gap-2 border-b px-4 py-3 last:border-0"
-            >
-              <span className="text-sm capitalize">
-                {pref.eventType.replace(/_/g, " ").toLowerCase()}
-              </span>
-              <div className="flex justify-center">
-                <input
-                  type="checkbox"
-                  checked={pref.email}
-                  onChange={() => togglePref(pref.eventType, "email")}
-                  className="h-4 w-4 rounded border-gray-300"
-                  aria-label={`Email notification for ${pref.eventType}`}
-                />
-              </div>
-              <div className="flex justify-center">
-                <input
-                  type="checkbox"
-                  checked={pref.inApp}
-                  onChange={() => togglePref(pref.eventType, "inApp")}
-                  className="h-4 w-4 rounded border-gray-300"
-                  aria-label={`In-app notification for ${pref.eventType}`}
-                />
-              </div>
-            </div>
-          ))}
+      <CardContent>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Configure email and in-app notification preferences.
+        </p>
+        <div className="rounded-md border border-dashed p-4">
+          <p className="text-sm italic text-muted-foreground">
+            Notification preferences coming soon.
+          </p>
         </div>
-        <Button onClick={handleSave} disabled={updateMutation.isPending}>
-          <Save className="mr-2 h-4 w-4" />
-          {updateMutation.isPending ? "Saving..." : "Save Preferences"}
-        </Button>
       </CardContent>
     </Card>
   );

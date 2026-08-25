@@ -2,15 +2,42 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
 import { qk } from "@/lib/query-keys";
 import { toast } from "@/lib/toast";
-import type { InviteTeacherFormValues, ImportPreview } from "../schemas/user-schemas";
+import type {
+  InviteTeacherFormValues,
+  InviteStudentFormValues,
+  ImportPreview,
+} from "../schemas/user-schemas";
 
 export function useInviteTeacherMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: InviteTeacherFormValues) => api.post("/users/invite", data),
+    mutationFn: (data: InviteTeacherFormValues) =>
+      api.post("/users/invite", {
+        email: data.email,
+        name: `${data.firstName} ${data.lastName}`.trim(),
+        role: data.role,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.users.all });
       toast.success("Invitation sent", "Teacher will receive an email to set up their account.");
+    },
+  });
+}
+
+export function useInviteStudentMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: InviteStudentFormValues) =>
+      api.post("/users/invite", {
+        email: data.email,
+        name: `${data.firstName} ${data.lastName}`.trim(),
+        role: "STUDENT",
+        ...(data.classId ? { classId: data.classId } : {}),
+        ...(data.batchId ? { batchId: data.batchId } : {}),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.users.all });
+      toast.success("Invitation sent", "Student will receive an email to set up their account.");
     },
   });
 }
@@ -84,7 +111,7 @@ export function usePreviewImportMutation() {
 // Start the actual import job
 export function useStartImportMutation() {
   return useMutation({
-    mutationFn: async ({ fileKey, role }: { fileKey: string; role: "student" | "teacher" }) => {
+    mutationFn: async ({ fileKey, role }: { fileKey: string; role: "STUDENT" | "TEACHER" }) => {
       return api.post<{ jobId: string }>("/users/import/start", { fileKey, role });
     },
     onSuccess: () => {

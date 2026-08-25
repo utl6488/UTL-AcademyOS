@@ -13,6 +13,7 @@ const SignupPage = lazy(() => import("@/features/auth/pages/SignupPage"));
 const ForgotPasswordPage = lazy(() => import("@/features/auth/pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("@/features/auth/pages/ResetPasswordPage"));
 const VerifyEmailPage = lazy(() => import("@/features/auth/pages/VerifyEmailPage"));
+const AcceptInvitePage = lazy(() => import("@/features/auth/pages/AcceptInvitePage"));
 const SessionsPage = lazy(() => import("@/features/auth/pages/SessionsPage"));
 
 // Dashboard
@@ -47,6 +48,7 @@ const GradingQueuePage = lazy(() => import("@/features/grading/pages/GradingQueu
 const GradingViewerPage = lazy(() => import("@/features/grading/pages/GradingViewerPage"));
 
 // Results & Analytics
+const MyResultsPage = lazy(() => import("@/features/results/pages/MyResultsPage"));
 const StudentResultPage = lazy(() => import("@/features/results/pages/StudentResultPage"));
 const LeaderboardPage = lazy(() => import("@/features/results/pages/LeaderboardPage"));
 const ClassReportPage = lazy(() => import("@/features/results/pages/ClassReportPage"));
@@ -127,6 +129,14 @@ export const router = createBrowserRouter([
         element: (
           <SuspenseWrapper>
             <VerifyEmailPage />
+          </SuspenseWrapper>
+        ),
+      },
+      {
+        path: "accept-invite",
+        element: (
+          <SuspenseWrapper>
+            <AcceptInvitePage />
           </SuspenseWrapper>
         ),
       },
@@ -302,7 +312,7 @@ export const router = createBrowserRouter([
         path: "results",
         element: (
           <SuspenseWrapper>
-            <StudentResultPage />
+            <MyResultsPage />
           </SuspenseWrapper>
         ),
       },

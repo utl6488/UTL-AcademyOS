@@ -88,6 +88,7 @@ export const ExamListQuerySchema = z.object({
   status: ApiExamStatus.optional(),
   mode: ApiExamMode.optional(),
   search: z.string().optional(),
+  tenantId: z.string().optional(),
   sortBy: z.enum(['createdAt', 'updatedAt', 'startAt', 'title']).default('createdAt'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
 });

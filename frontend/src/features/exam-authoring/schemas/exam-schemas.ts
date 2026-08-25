@@ -66,6 +66,8 @@ export const examListItemSchema = z.object({
   startAt: z.string().nullable(),
   endAt: z.string().nullable(),
   activeAttempts: z.number(),
+  tenantId: z.string().optional(),
+  tenantName: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

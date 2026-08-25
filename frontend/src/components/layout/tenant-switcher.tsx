@@ -22,10 +22,11 @@ export function TenantSwitcher() {
   const setImpersonated = useTenantContextStore((s) => s.setImpersonated);
   const queryClient = useQueryClient();
 
-  const { data } = useTenants({ pageSize: 100 });
+  const isSuperAdmin = role === "SUPER_ADMIN";
+  const { data } = useTenants({ pageSize: 100 }, { enabled: isSuperAdmin });
   const tenants = data?.data ?? [];
 
-  if (role !== "SUPER_ADMIN") return null;
+  if (!isSuperAdmin) return null;
 
   function select(id: string | null, name: string | null) {
     setImpersonated(id, name);

@@ -21,6 +21,7 @@ attemptRouter.use(requireAuth, tenantScope);
 
 const TAKE = requirePermission(Permission.EXAM_TAKE);
 
+attemptRouter.get('/mine', TAKE, ctrl.listMine);
 attemptRouter.post('/reserve', TAKE, validate({ body: ReserveAttemptSchema }), ctrl.reserve);
 attemptRouter.get('/:id', TAKE, ctrl.detail);
 attemptRouter.get('/:id/answers', TAKE, ctrl.answers);

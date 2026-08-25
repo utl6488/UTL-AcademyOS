@@ -523,3 +523,34 @@ export async function autoSubmitAttempt(
   });
   return updated.status;
 }
+
+// ---------------------------------------------------------------------------
+// List the current student's own submitted attempts — powers "My Results".
+// Only returns terminal statuses; hides in-progress / not-started attempts.
+// ---------------------------------------------------------------------------
+
+export async function listMyAttempts(studentId: string) {
+  const prisma = getPrisma();
+  const attempts = await prisma.examAttempt.findMany({
+    where: {
+      studentId,
+      status: { in: ['SUBMITTED', 'AUTO_SUBMITTED', 'EVALUATED'] },
+    },
+    orderBy: { submittedAt: 'desc' },
+    include: {
+      exam: { select: { id: true, title: true, totalMarks: true, resultsReleased: true } },
+      result: { select: { score: true, maxScore: true } },
+    },
+  });
+
+  return attempts.map((a) => ({
+    attemptId: a.id,
+    examId: a.examId,
+    examTitle: a.exam.title,
+    status: a.status,
+    submittedAt: (a.submittedAt ?? a.updatedAt).toISOString(),
+    resultsReleased: a.exam.resultsReleased,
+    score: a.result?.score ?? a.scoredMarks ?? null,
+    maxScore: a.result?.maxScore ?? a.exam.totalMarks,
+  }));
+}

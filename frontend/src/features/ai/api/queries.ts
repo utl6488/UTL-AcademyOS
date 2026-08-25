@@ -25,7 +25,7 @@ export function useWeakTopics(studentId: string) {
 export function useStudyPlan(studentId: string) {
   return useQuery({
     queryKey: qk.ai.studyPlan(studentId),
-    queryFn: () => api.get<StudyPlan>(`/ai/students/${studentId}/study-plan`),
+    queryFn: () => api.get<StudyPlan | null>(`/ai/students/${studentId}/study-plan`),
     enabled: !!studentId,
   });
 }

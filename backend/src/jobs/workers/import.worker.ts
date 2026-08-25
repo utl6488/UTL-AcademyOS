@@ -11,10 +11,14 @@ export function startImportWorker(): Worker<ImportJobData> {
   const worker = new Worker<ImportJobData>(
     IMPORT_QUEUE_NAME,
     async (job) => {
-      const rec = await getPrisma().importJob.findUnique({
-        where: { id: job.data.jobId },
-        select: { tenantId: true, kind: true },
-      });
+      // Discovery lookup: we don't know the tenant yet, so bypass the tenant
+      // guard just for this read. The subsequent work runs inside withTenant.
+      const rec = await withTenant({ tenantId: '', bypass: true }, () =>
+        getPrisma().importJob.findUnique({
+          where: { id: job.data.jobId },
+          select: { tenantId: true, kind: true },
+        }),
+      );
       if (!rec) return;
       await withTenant({ tenantId: rec.tenantId }, () =>
         rec.kind === 'QUESTION'

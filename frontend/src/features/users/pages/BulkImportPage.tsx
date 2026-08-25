@@ -44,7 +44,7 @@ type Step = "upload" | "preview" | "importing" | "complete";
 
 export default function BulkImportPage() {
   const [step, setStep] = useState<Step>("upload");
-  const [role, setRole] = useState<"student" | "teacher">("student");
+  const [role, setRole] = useState<"STUDENT" | "TEACHER">("STUDENT");
   const [fileKey, setFileKey] = useState<string | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -101,13 +101,13 @@ export default function BulkImportPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Import as</Label>
-              <Select value={role} onValueChange={(v) => setRole(v as "student" | "teacher")}>
+              <Select value={role} onValueChange={(v) => setRole(v as "STUDENT" | "TEACHER")}>
                 <SelectTrigger className="w-48">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="student">Students</SelectItem>
-                  <SelectItem value="teacher">Teachers</SelectItem>
+                  <SelectItem value="STUDENT">Students</SelectItem>
+                  <SelectItem value="TEACHER">Teachers</SelectItem>
                 </SelectContent>
               </Select>
             </div>

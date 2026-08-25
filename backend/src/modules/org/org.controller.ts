@@ -19,8 +19,8 @@ function paramId(req: Request, key: string): string {
 }
 
 // -------- Branches --------
-export const listBranches = asyncHandler(async (_req, res: Response) => {
-  ok(res, await service.listBranches());
+export const listBranches = asyncHandler(async (req, res: Response) => {
+  ok(res, await service.listBranches({ tenantId: str(req.query.tenantId) }));
 });
 export const createBranch = asyncHandler(async (req, res: Response) => {
   created(res, await service.createBranch({ ...req.body, tenantId: tenantIdOf(req) }));
@@ -50,7 +50,13 @@ export const deleteAcademicYear = asyncHandler(async (req, res: Response) => {
 
 // -------- Classes --------
 export const listClasses = asyncHandler(async (req, res: Response) => {
-  ok(res, await service.listClasses({ branchId: str(req.query.branchId) }));
+  ok(
+    res,
+    await service.listClasses({
+      branchId: str(req.query.branchId),
+      tenantId: str(req.query.tenantId),
+    }),
+  );
 });
 export const createClass = asyncHandler(async (req, res: Response) => {
   created(res, await service.createClass(tenantIdOf(req), req.body));
@@ -65,7 +71,13 @@ export const deleteClass = asyncHandler(async (req, res: Response) => {
 
 // -------- Batches --------
 export const listBatches = asyncHandler(async (req, res: Response) => {
-  ok(res, await service.listBatches({ classId: str(req.query.classId) }));
+  ok(
+    res,
+    await service.listBatches({
+      classId: str(req.query.classId),
+      tenantId: str(req.query.tenantId),
+    }),
+  );
 });
 export const createBatch = asyncHandler(async (req, res: Response) => {
   created(res, await service.createBatch(tenantIdOf(req), req.body));
@@ -80,7 +92,13 @@ export const deleteBatch = asyncHandler(async (req, res: Response) => {
 
 // -------- Subjects --------
 export const listSubjects = asyncHandler(async (req, res: Response) => {
-  ok(res, await service.listSubjects({ classId: str(req.query.classId) }));
+  ok(
+    res,
+    await service.listSubjects({
+      classId: str(req.query.classId),
+      tenantId: str(req.query.tenantId),
+    }),
+  );
 });
 export const createSubject = asyncHandler(async (req, res: Response) => {
   created(res, await service.createSubject(tenantIdOf(req), req.body));

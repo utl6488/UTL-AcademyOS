@@ -186,7 +186,7 @@ export async function getStudyPlan(studentId: string) {
     where: { studentId },
     orderBy: { createdAt: 'desc' },
   });
-  if (!p) throw AppError.notFound('No study plan yet');
+  if (!p) return null;
   return {
     id: p.id,
     week: p.week,

@@ -17,7 +17,7 @@ import { ErrorState } from "@/components/feedback/error-state";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { useWeakTopics, useStudyPlan, usePredictions } from "../api/queries";
 import { useGenerateStudyPlanMutation, useSubmitAiFeedbackMutation } from "../api/mutations";
-import { useAuth } from "@/features/auth/hooks/use-auth";
+import { useAuthStore } from "@/store/auth-store";
 import { formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -34,8 +34,7 @@ const TREND_COLORS = {
 } as const;
 
 export default function StudentAiPage() {
-  const { user } = useAuth();
-  const studentId = user?.id ?? "";
+  const studentId = useAuthStore((s) => s.user?.id ?? "");
 
   const {
     data: weakTopics,
@@ -58,22 +57,6 @@ export default function StudentAiPage() {
 
   const generatePlanMutation = useGenerateStudyPlanMutation();
   const feedbackMutation = useSubmitAiFeedbackMutation();
-
-  const isLoading = loadingTopics || loadingPlan || loadingPredictions;
-  const isError = errorTopics || errorPlan || errorPredictions;
-
-  if (isLoading) return <LoadingSkeleton variant="card" />;
-  if (isError) {
-    return (
-      <ErrorState
-        onRetry={() => {
-          refetchTopics();
-          refetchPlan();
-          refetchPredictions();
-        }}
-      />
-    );
-  }
 
   const handleFeedback = (outputId: string, thumbsUp: boolean) => {
     feedbackMutation.mutate({ outputId, thumbsUp });
@@ -99,7 +82,11 @@ export default function StudentAiPage() {
             <CardTitle className="text-sm font-medium">Predicted Score</CardTitle>
           </CardHeader>
           <CardContent>
-            {predictions ? (
+            {loadingPredictions ? (
+              <LoadingSkeleton variant="card" />
+            ) : errorPredictions ? (
+              <ErrorState onRetry={() => refetchPredictions()} />
+            ) : predictions ? (
               <div className="flex flex-col items-center gap-3">
                 <div className="relative h-32 w-32">
                   <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
@@ -192,7 +179,11 @@ export default function StudentAiPage() {
             </Button>
           </CardHeader>
           <CardContent>
-            {studyPlan ? (
+            {loadingPlan ? (
+              <LoadingSkeleton variant="card" />
+            ) : errorPlan ? (
+              <ErrorState onRetry={() => refetchPlan()} />
+            ) : studyPlan ? (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">Week {studyPlan.week}</p>
                 <div>
@@ -257,7 +248,11 @@ export default function StudentAiPage() {
             <CardTitle className="text-sm font-medium">Weak Topics</CardTitle>
           </CardHeader>
           <CardContent>
-            {weakTopics && weakTopics.length > 0 ? (
+            {loadingTopics ? (
+              <LoadingSkeleton variant="card" />
+            ) : errorTopics ? (
+              <ErrorState onRetry={() => refetchTopics()} />
+            ) : weakTopics && weakTopics.length > 0 ? (
               <div className="space-y-3">
                 {weakTopics.map((topic) => {
                   const TrendIcon = TREND_ICONS[topic.trend];
@@ -325,7 +320,7 @@ export default function StudentAiPage() {
                     </p>
                   </div>
                   <Button variant="outline" size="sm" asChild>
-                    <Link to={`/questions?topic=${encodeURIComponent(topic.topic)}`}>Practice</Link>
+                    <Link to="/exams">Practice</Link>
                   </Button>
                 </div>
               ))}

@@ -107,6 +107,7 @@ type QuestionWithRels = Question & {
   subject: { id: string; name: string };
   topic: { id: string; name: string } | null;
   createdBy?: { id: string; name: string } | null;
+  tenant?: { id: string; name: string } | null;
 };
 
 function toListItem(q: QuestionWithRels) {
@@ -121,6 +122,8 @@ function toListItem(q: QuestionWithRels) {
     difficulty: DIFF_TO_API[q.difficulty],
     tags: q.tags,
     marks: q.marks,
+    tenantId: q.tenantId,
+    tenantName: q.tenant?.name ?? null,
     createdAt: q.createdAt.toISOString(),
     updatedAt: q.updatedAt.toISOString(),
   };
@@ -149,6 +152,7 @@ function toDetail(q: QuestionWithRels) {
 // ---------------------------------------------------------------------------
 
 const RELATIONS = {
+  tenant: { select: { id: true, name: true } },
   subject: { select: { id: true, name: true } },
   topic: { select: { id: true, name: true } },
   createdBy: { select: { id: true, name: true } },
@@ -161,6 +165,7 @@ export async function listQuestions(query: QuestionListQuery) {
   if (query.type) where.type = query.type;
   if (query.difficulty) where.difficulty = DIFF_TO_DB[query.difficulty];
   if (query.tags?.length) where.tags = { hasSome: query.tags };
+  if (query.tenantId) where.tenantId = query.tenantId;
   if (query.search) {
     where.OR = [
       { text: { contains: query.search, mode: 'insensitive' } },

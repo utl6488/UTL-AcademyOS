@@ -3,11 +3,19 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Pencil, Trash2, Building } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
+import { OrgTabs } from "../components/org-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -27,9 +35,26 @@ import {
   useDeleteBranchMutation,
 } from "../api/mutations";
 import { branchFormSchema, type BranchFormValues, type Branch } from "../schemas/org-schemas";
+import { useAuthStore } from "@/store/auth-store";
+import { useTenantContextStore } from "@/store/tenant-context-store";
+import { useTenants } from "@/features/admin/api/queries";
 
 export default function BranchesPage() {
-  const { data: branches, isLoading, isError, refetch } = useBranches();
+  const role = useAuthStore((s) => s.user?.role);
+  const impersonatedTenantId = useTenantContextStore((s) => s.impersonatedTenantId);
+  const isGodView = role === "SUPER_ADMIN" && !impersonatedTenantId;
+
+  const [tenantId, setTenantId] = useState<string | undefined>(undefined);
+
+  const { data: tenantsData } = useTenants({ pageSize: 100 }, { enabled: isGodView });
+  const tenants = tenantsData?.data ?? [];
+
+  const {
+    data: branches,
+    isLoading,
+    isError,
+    refetch,
+  } = useBranches(isGodView ? { tenantId } : undefined);
   const createMutation = useCreateBranchMutation();
   const updateMutation = useUpdateBranchMutation();
   const deleteMutation = useDeleteBranchMutation();
@@ -73,6 +98,7 @@ export default function BranchesPage() {
 
   return (
     <div className="space-y-6">
+      <OrgTabs />
       <PageHeader
         title="Branches"
         description="Manage your institute branches"
@@ -82,6 +108,24 @@ export default function BranchesPage() {
           </Button>
         }
       />
+
+      {isGodView && (
+        <div className="flex flex-wrap gap-3">
+          <Select value={tenantId || ""} onValueChange={(v) => setTenantId(v || undefined)}>
+            <SelectTrigger className="w-56">
+              <SelectValue placeholder="All institutes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All institutes</SelectItem>
+              {tenants.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {branches?.length === 0 ? (
         <EmptyState
@@ -98,6 +142,11 @@ export default function BranchesPage() {
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="font-medium">{branch.name}</h3>
+                    {isGodView && branch.tenantName && (
+                      <p className="text-xs text-muted-foreground">
+                        Institute: {branch.tenantName}
+                      </p>
+                    )}
                     {branch.code && (
                       <p className="text-sm text-muted-foreground">Code: {branch.code}</p>
                     )}

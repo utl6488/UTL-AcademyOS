@@ -1,10 +1,11 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { Flag, ChevronLeft, ChevronRight, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadingSkeleton } from "@/components/feedback/loading-skeleton";
 import { ErrorState } from "@/components/feedback/error-state";
+import { api } from "@/lib/api-client";
 import { useAttemptInfo, useAttemptAnswers } from "../api/queries";
 import { useStartAttemptMutation, useSubmitAttemptMutation } from "../api/mutations";
 import { useAttemptStore } from "../store/attempt-store";
@@ -55,6 +56,25 @@ export default function ExamAttemptPage() {
   // Mutations
   const startMutation = useStartAttemptMutation();
   const submitMutation = useSubmitAttemptMutation();
+
+  // Reserve an attempt row on first mount so the intro screen has data to render.
+  // `reserve` is idempotent server-side — returns the existing attempt if one exists.
+  // Uses `api.post` directly (not useMutation) because useMutation-in-useEffect
+  // subscriptions get lost in StrictMode + Suspense/lazy — the mutation resolved
+  // but the observer never notified React of the state change.
+  const reserveTriggeredRef = useRef(false);
+  const [reserveError, setReserveError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!examId || attemptId || reserveTriggeredRef.current) return;
+    reserveTriggeredRef.current = true;
+    api
+      .post<{ attemptId: string }>(`/attempts/reserve`, { examId })
+      .then((res) => setAttemptId(res.attemptId))
+      .catch((err) => {
+        reserveTriggeredRef.current = false;
+        setReserveError(err instanceof Error ? err.message : "Failed to open exam");
+      });
+  }, [examId, attemptId]);
 
   // Timer
   const { remainingSeconds, isExpired, isLastMinute } = useExamTimer();
@@ -195,6 +215,18 @@ export default function ExamAttemptPage() {
 
   // ─── Render Phases ─────────────────────────────────────────────────
 
+  if (reserveError) {
+    return (
+      <ErrorState
+        title="Unable to open this exam"
+        description={reserveError}
+        onRetry={() => {
+          reserveTriggeredRef.current = false;
+          setReserveError(null);
+        }}
+      />
+    );
+  }
   if (phase === "loading" || isLoading) return <LoadingSkeleton variant="page" />;
   if (isError) return <ErrorState onRetry={() => refetch()} />;
   if (!attemptInfo) return <LoadingSkeleton variant="page" />;

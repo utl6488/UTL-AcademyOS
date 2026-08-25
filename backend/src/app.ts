@@ -33,6 +33,9 @@ export function createApp(): Express {
   // Trust one proxy hop (Nginx / LB); adjust in prod as needed.
   app.set('trust proxy', 1);
   app.disable('x-powered-by');
+  // Auth-scoped JSON APIs don't benefit from ETags, and 304 responses trip up
+  // the frontend fetch client (it treats !response.ok as an error).
+  app.disable('etag');
 
   app.use(requestId);
   app.use(

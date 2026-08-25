@@ -5,6 +5,7 @@ import { rateLimit } from '@/common/middleware/rateLimit.js';
 import { validate } from '@/common/middleware/validate.js';
 import * as ctrl from '@/modules/auth/auth.controller.js';
 import {
+  AcceptInviteSchema,
   ForgotPasswordSchema,
   LoginSchema,
   RefreshSchema,
@@ -51,6 +52,13 @@ authRouter.post(
   strictLimit,
   validate({ body: ResetPasswordSchema }),
   ctrl.resetPassword,
+);
+
+authRouter.post(
+  '/accept-invite',
+  strictLimit,
+  validate({ body: AcceptInviteSchema }),
+  ctrl.acceptInvite,
 );
 
 authRouter.get('/me', requireAuth, me);

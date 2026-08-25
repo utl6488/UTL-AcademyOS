@@ -10,7 +10,7 @@ export interface EmailJobData {
 export function enqueueEmail(job: EmailJobData) {
   return getQueue(QueueName.EMAIL).add('send', job, {
     // idempotency on (to + subject + first 32 chars of text) to squash dupes
-    jobId: `${job.to}:${hash(`${job.subject}:${job.text.slice(0, 32)}:${Date.now()}`)}`,
+    jobId: `${job.to.replace(/:/g, '_')}__${hash(`${job.subject}:${job.text.slice(0, 32)}:${Date.now()}`)}`,
   });
 }
 

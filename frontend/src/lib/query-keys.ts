@@ -78,6 +78,7 @@ export const qk = {
     all: ["attempts"] as const,
     detail: (id: string) => [...qk.attempts.all, "detail", id] as const,
     answers: (attemptId: string) => [...qk.attempts.all, "answers", attemptId] as const,
+    mine: () => [...qk.attempts.all, "mine"] as const,
   },
 
   grading: {

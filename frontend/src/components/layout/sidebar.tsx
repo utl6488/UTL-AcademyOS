@@ -10,6 +10,7 @@ import {
   FolderTree,
   GraduationCap,
   LayoutDashboard,
+  Presentation,
   Settings,
   Shield,
   Trophy,
@@ -43,7 +44,8 @@ const OWNER_ADMIN_TEACHER: Role[] = ["INSTITUTE_OWNER", "ADMIN", "TEACHER"];
 const mainNav: NavItem[] = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
   { label: "Institute", href: "/institute", icon: Building2, roles: OWNER_ADMIN },
-  { label: "Users", href: "/users", icon: Users, roles: OWNER_ADMIN_TEACHER },
+  { label: "Teachers", href: "/users/teachers", icon: Presentation, roles: OWNER_ADMIN },
+  { label: "Students", href: "/users/students", icon: Users, roles: OWNER_ADMIN_TEACHER },
   { label: "Organization", href: "/org/branches", icon: FolderTree, roles: OWNER_ADMIN },
   {
     label: "Subjects & Topics",
@@ -58,7 +60,7 @@ const mainNav: NavItem[] = [
     roles: OWNER_ADMIN_TEACHER,
   },
   { label: "Exams", href: "/exams", icon: ClipboardList },
-  { label: "Results", href: "/results", icon: Trophy },
+  { label: "Results", href: "/results", icon: Trophy, roles: ["STUDENT"] },
   { label: "Analytics", href: "/analytics", icon: BarChart3, roles: OWNER_ADMIN_TEACHER },
   { label: "AI Features", href: "/ai", icon: Brain },
 ];
@@ -76,6 +78,7 @@ export function Sidebar({ open, onToggle }: SidebarProps) {
 
   function isVisible(item: NavItem) {
     if (!item.roles) return true;
+    if (user?.role === "SUPER_ADMIN") return true;
     return user ? item.roles.includes(user.role) : false;
   }
 

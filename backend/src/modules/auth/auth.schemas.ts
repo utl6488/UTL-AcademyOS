@@ -37,3 +37,9 @@ export const ResendVerificationSchema = z.object({
   email: EmailSchema,
 });
 export type ResendVerificationInput = z.infer<typeof ResendVerificationSchema>;
+
+export const AcceptInviteSchema = z.object({
+  token: z.string().min(10),
+  password: PasswordSchema,
+});
+export type AcceptInviteInput = z.infer<typeof AcceptInviteSchema>;

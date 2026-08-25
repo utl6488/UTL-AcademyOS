@@ -15,17 +15,17 @@ import {
   type Topic,
 } from "../schemas/org-schemas";
 
-export function useBranches() {
+export function useBranches(filters?: { tenantId?: string }) {
   return useQuery({
-    queryKey: qk.org.branches.list(),
+    queryKey: qk.org.branches.list(filters),
     queryFn: async () => {
-      const data = await api.get<Branch[]>("/org/branches");
+      const data = await api.get<Branch[]>("/org/branches", filters);
       return parseApiArrayResponse(branchSchema, data);
     },
   });
 }
 
-export function useClasses(filters?: { branchId?: string }) {
+export function useClasses(filters?: { branchId?: string; tenantId?: string }) {
   return useQuery({
     queryKey: qk.org.classes.list(filters),
     queryFn: async () => {
@@ -35,7 +35,7 @@ export function useClasses(filters?: { branchId?: string }) {
   });
 }
 
-export function useBatches(filters?: { classId?: string }) {
+export function useBatches(filters?: { classId?: string; tenantId?: string }) {
   return useQuery({
     queryKey: qk.org.batches.list(filters),
     queryFn: async () => {
@@ -45,7 +45,7 @@ export function useBatches(filters?: { classId?: string }) {
   });
 }
 
-export function useSubjects(filters?: { classId?: string }) {
+export function useSubjects(filters?: { classId?: string; tenantId?: string }) {
   return useQuery({
     queryKey: qk.org.subjects.list(filters),
     queryFn: async () => {

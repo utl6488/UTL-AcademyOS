@@ -17,10 +17,11 @@ export interface TenantFilters extends PaginationParams {
   [key: string]: string | number | boolean | string[] | undefined;
 }
 
-export function useTenants(filters: TenantFilters = {}) {
+export function useTenants(filters: TenantFilters = {}, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: qk.admin.tenants.list(filters),
     queryFn: () => api.get<PaginatedResponse<Tenant>>("/admin/tenants", filters),
+    enabled: options.enabled ?? true,
   });
 }
 

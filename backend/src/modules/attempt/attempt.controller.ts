@@ -29,6 +29,10 @@ function paramId(req: Request, key: string): string {
   return v;
 }
 
+export const listMine = asyncHandler(async (req, res: Response) => {
+  ok(res, await service.listMyAttempts(studentIdOf(req)));
+});
+
 export const reserve = asyncHandler(async (req, res: Response) => {
   const { examId } = ReserveAttemptSchema.parse(req.body);
   const r = await service.reserveAttempt(tenantIdOf(req), studentIdOf(req), examId);

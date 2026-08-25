@@ -1,7 +1,7 @@
 import { Worker } from 'bullmq';
 
 import { logger } from '@/common/logger.js';
-import { getPrisma, withTenant } from '@/db/prisma.js';
+import { withTenant } from '@/db/prisma.js';
 import { getRedis } from '@/db/redis.js';
 import { EXAM_NOTIFY_QUEUE_NAME, type ExamPublishedJobData } from '@/jobs/exam.queue.js';
 import { notifyExamPublished } from '@/modules/exam/exam.notify.service.js';
@@ -10,12 +10,7 @@ export function startExamWorker(): Worker<ExamPublishedJobData> {
   const worker = new Worker<ExamPublishedJobData>(
     EXAM_NOTIFY_QUEUE_NAME,
     async (job) => {
-      const rec = await getPrisma().exam.findUnique({
-        where: { id: job.data.examId },
-        select: { tenantId: true },
-      });
-      if (!rec) return;
-      await withTenant({ tenantId: rec.tenantId }, () => notifyExamPublished(job.data.examId));
+      await withTenant({ tenantId: job.data.tenantId }, () => notifyExamPublished(job.data.examId));
     },
     { connection: getRedis(), concurrency: 4 },
   );

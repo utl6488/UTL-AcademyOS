@@ -2,11 +2,13 @@ import { z } from "zod";
 
 export const AttemptStatus = z.enum([
   "NOT_STARTED",
+  "RESERVED",
   "LOBBY",
   "IN_PROGRESS",
   "SUBMITTED",
   "AUTO_SUBMITTED",
   "LOCKED_OUT",
+  "EVALUATED",
 ]);
 export type AttemptStatus = z.infer<typeof AttemptStatus>;
 

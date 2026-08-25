@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Upload, MoreHorizontal, Users } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Plus, Upload, MoreHorizontal, Users, Mail } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -26,35 +29,97 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { LoadingSkeleton } from "@/components/feedback/loading-skeleton";
 import { ErrorState } from "@/components/feedback/error-state";
 import { DataTable } from "@/components/data-table";
 import { useStudents, useUserDetail } from "../api/queries";
+import {
+  useInviteStudentMutation,
+  useDeactivateUserMutation,
+  useActivateUserMutation,
+} from "../api/mutations";
+import { UserEditDialog } from "../components/user-edit-dialog";
+import { useAuthStore } from "@/store/auth-store";
+import { useTenantContextStore } from "@/store/tenant-context-store";
+import { useTenants } from "@/features/admin/api/queries";
 import { useClasses, useBatches } from "@/features/org/api/queries";
-import { formatRelativeTime, formatDate } from "@/lib/format";
-import type { UserListItem } from "../schemas/user-schemas";
+import { formatRelativeTime, formatDate, getInitials } from "@/lib/format";
+import {
+  inviteStudentSchema,
+  type InviteStudentFormValues,
+  type UserListItem,
+} from "../schemas/user-schemas";
 import type { ColumnDef } from "@tanstack/react-table";
 
 export default function StudentsPage() {
   const navigate = useNavigate();
+  const role = useAuthStore((s) => s.user?.role);
+  const impersonatedTenantId = useTenantContextStore((s) => s.impersonatedTenantId);
+  const isGodView = role === "SUPER_ADMIN" && !impersonatedTenantId;
+
   const [filters, setFilters] = useState<{
     classId?: string;
     batchId?: string;
     status?: string;
     search?: string;
+    tenantId?: string;
   }>({});
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+
+  const { data: tenantsData } = useTenants({ pageSize: 100 }, { enabled: isGodView });
+  const tenants = tenantsData?.data ?? [];
 
   const { data, isLoading, isError, refetch } = useStudents(filters);
   const { data: classes } = useClasses();
   const { data: batches } = useBatches(filters.classId ? { classId: filters.classId } : undefined);
   const { data: userDetail } = useUserDetail(selectedUserId || "");
+  const inviteMutation = useInviteStudentMutation();
+  const deactivateMutation = useDeactivateUserMutation();
+  const activateMutation = useActivateUserMutation();
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [editUser, setEditUser] = useState<UserListItem | null>(null);
+
+  function handleToggleStatus(user: UserListItem) {
+    if (user.status === "SUSPENDED") {
+      if (!window.confirm(`Reactivate ${user.name}?`)) return;
+      activateMutation.mutate(user.id);
+    } else {
+      if (!window.confirm(`Deactivate ${user.name}? They won't be able to sign in.`)) return;
+      deactivateMutation.mutate(user.id);
+    }
+  }
+
+  const inviteForm = useForm<InviteStudentFormValues>({
+    resolver: zodResolver(inviteStudentSchema),
+    defaultValues: { email: "", firstName: "", lastName: "", classId: "", batchId: "" },
+  });
+  const inviteClassId = inviteForm.watch("classId");
+  const { data: inviteBatches } = useBatches(
+    inviteClassId ? { classId: inviteClassId } : undefined
+  );
+
+  function onSubmitInvite(values: InviteStudentFormValues) {
+    inviteMutation.mutate(values, {
+      onSuccess: () => {
+        setInviteOpen(false);
+        inviteForm.reset();
+      },
+    });
+  }
 
   const columns: ColumnDef<UserListItem>[] = [
     {
-      accessorKey: "firstName",
+      accessorKey: "name",
       header: "Student",
       cell: ({ row }) => (
         <div className="flex items-center gap-3">
@@ -62,19 +127,25 @@ export default function StudentsPage() {
             <img src={row.original.avatar} alt="" className="h-8 w-8 rounded-full object-cover" />
           ) : (
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
-              {row.original.firstName[0]}
-              {row.original.lastName[0]}
+              {getInitials(row.original.name)}
             </div>
           )}
           <div>
-            <p className="text-sm font-medium">
-              {row.original.firstName} {row.original.lastName}
-            </p>
+            <p className="text-sm font-medium">{row.original.name}</p>
             <p className="text-xs text-muted-foreground">{row.original.email}</p>
           </div>
         </div>
       ),
     },
+    ...(isGodView
+      ? [
+          {
+            accessorKey: "tenantName",
+            header: "Institute",
+            cell: ({ row }: { row: { original: UserListItem } }) => row.original.tenantName || "—",
+          } as ColumnDef<UserListItem>,
+        ]
+      : []),
     {
       accessorKey: "className",
       header: "Class",
@@ -91,14 +162,15 @@ export default function StudentsPage() {
       cell: ({ row }) => (
         <Badge
           variant={
-            row.original.status === "active"
+            row.original.status === "ACTIVE"
               ? "success"
-              : row.original.status === "pending"
+              : row.original.status === "INVITED"
                 ? "warning"
                 : "secondary"
           }
+          className="capitalize"
         >
-          {row.original.status}
+          {row.original.status.toLowerCase()}
         </Badge>
       ),
     },
@@ -110,23 +182,32 @@ export default function StudentsPage() {
     },
     {
       id: "actions",
-      cell: ({ row }) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setSelectedUserId(row.original.id)}>
-              View Details
-            </DropdownMenuItem>
-            <DropdownMenuItem>Edit</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">Deactivate</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
+      cell: ({ row }) => {
+        const user = row.original;
+        const isSuspended = user.status === "SUSPENDED";
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => setSelectedUserId(user.id)}>
+                View Details
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setEditUser(user)}>Edit</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={() => handleToggleStatus(user)}
+                className={isSuspended ? undefined : "text-destructive"}
+              >
+                {isSuspended ? "Activate" : "Deactivate"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
     },
   ];
 
@@ -145,7 +226,7 @@ export default function StudentsPage() {
             <Button variant="outline" onClick={() => navigate("/users/import")}>
               <Upload className="mr-2 h-4 w-4" /> Bulk Import
             </Button>
-            <Button>
+            <Button onClick={() => setInviteOpen(true)}>
               <Plus className="mr-2 h-4 w-4" /> Add Student
             </Button>
           </div>
@@ -160,6 +241,24 @@ export default function StudentsPage() {
           value={filters.search || ""}
           onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
         />
+        {isGodView && (
+          <Select
+            value={filters.tenantId || ""}
+            onValueChange={(v) => setFilters((f) => ({ ...f, tenantId: v || undefined }))}
+          >
+            <SelectTrigger className="w-56">
+              <SelectValue placeholder="All institutes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All institutes</SelectItem>
+              {tenants.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Select
           value={filters.classId || ""}
           onValueChange={(v) =>
@@ -203,9 +302,9 @@ export default function StudentsPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="">All</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="inactive">Inactive</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="ACTIVE">Active</SelectItem>
+            <SelectItem value="INVITED">Invited</SelectItem>
+            <SelectItem value="SUSPENDED">Suspended</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -221,7 +320,7 @@ export default function StudentsPage() {
         <DataTable
           columns={columns}
           data={students}
-          searchKey="firstName"
+          searchKey="name"
           searchPlaceholder="Search in results..."
         />
       )}
@@ -245,20 +344,17 @@ export default function StudentsPage() {
                   />
                 ) : (
                   <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-lg font-medium text-primary">
-                    {userDetail.firstName[0]}
-                    {userDetail.lastName[0]}
+                    {getInitials(userDetail.name)}
                   </div>
                 )}
                 <div>
-                  <h3 className="font-semibold">
-                    {userDetail.firstName} {userDetail.lastName}
-                  </h3>
+                  <h3 className="font-semibold">{userDetail.name}</h3>
                   <p className="text-sm text-muted-foreground">{userDetail.email}</p>
                   <Badge
-                    className="mt-1"
-                    variant={userDetail.status === "active" ? "success" : "secondary"}
+                    className="mt-1 capitalize"
+                    variant={userDetail.status === "ACTIVE" ? "success" : "secondary"}
                   >
-                    {userDetail.status}
+                    {userDetail.status.toLowerCase()}
                   </Badge>
                 </div>
               </div>
@@ -326,6 +422,133 @@ export default function StudentsPage() {
           )}
         </SheetContent>
       </Sheet>
+
+      <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Invite Student</DialogTitle>
+            <DialogDescription>
+              Send an email invitation. The student will set their own password.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={inviteForm.handleSubmit(onSubmitInvite)} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="stu-first">First Name *</Label>
+                <Input id="stu-first" {...inviteForm.register("firstName")} />
+                {inviteForm.formState.errors.firstName && (
+                  <p className="text-xs text-destructive">
+                    {inviteForm.formState.errors.firstName.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="stu-last">Last Name *</Label>
+                <Input id="stu-last" {...inviteForm.register("lastName")} />
+                {inviteForm.formState.errors.lastName && (
+                  <p className="text-xs text-destructive">
+                    {inviteForm.formState.errors.lastName.message}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="stu-email">Email *</Label>
+              <Input
+                id="stu-email"
+                type="email"
+                placeholder="student@example.com"
+                {...inviteForm.register("email")}
+              />
+              {inviteForm.formState.errors.email && (
+                <p className="text-xs text-destructive">
+                  {inviteForm.formState.errors.email.message}
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Class (optional)</Label>
+              <Select
+                value={inviteForm.watch("classId") || ""}
+                onValueChange={(v) => {
+                  inviteForm.setValue("classId", v || undefined);
+                  inviteForm.setValue("batchId", undefined);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Unassigned" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Unassigned</SelectItem>
+                  {classes?.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {classes && classes.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No classes exist yet.{" "}
+                  <button
+                    type="button"
+                    className="text-primary hover:underline"
+                    onClick={() => {
+                      setInviteOpen(false);
+                      navigate("/org/classes");
+                    }}
+                  >
+                    Create one
+                  </button>{" "}
+                  to assign this student.
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Batch (optional)</Label>
+              <Select
+                value={inviteForm.watch("batchId") || ""}
+                onValueChange={(v) => inviteForm.setValue("batchId", v || undefined)}
+                disabled={!inviteBatches || inviteBatches.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={
+                      !inviteClassId
+                        ? "Select a class first"
+                        : inviteBatches?.length
+                          ? "Unassigned"
+                          : "No batches in this class"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Unassigned</SelectItem>
+                  {inviteBatches?.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setInviteOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" loading={inviteMutation.isPending}>
+                <Mail className="mr-2 h-4 w-4" /> Send Invitation
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <UserEditDialog
+        user={editUser}
+        open={!!editUser}
+        onOpenChange={(o) => !o && setEditUser(null)}
+      />
     </div>
   );
 }

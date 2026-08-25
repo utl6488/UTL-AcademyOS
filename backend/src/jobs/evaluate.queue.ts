@@ -7,6 +7,6 @@ export interface EvaluateJobData {
 
 export function enqueueEvaluate(data: EvaluateJobData) {
   return getQueue(QueueName.EVALUATION).add('evaluate', data, {
-    jobId: `evaluate:${data.attemptId}`,
+    jobId: `evaluate-${data.attemptId}`,
   });
 }

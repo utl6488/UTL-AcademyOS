@@ -41,6 +41,8 @@ export const questionListItemSchema = z.object({
   difficulty: Difficulty,
   tags: z.array(z.string()),
   marks: z.number(),
+  tenantId: z.string().optional(),
+  tenantName: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

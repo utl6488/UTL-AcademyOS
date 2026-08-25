@@ -84,12 +84,34 @@ export async function evaluateAttempt(attemptId: string): Promise<void> {
   // finalises later via `grading.submit-grades`).
   if (!hasPendingReview) {
     await upsertResult(attemptId, autoScored, correctCount, wrongCount, unansweredCount);
+    await maybeAutoReleaseResults(attempt.exam);
   }
 
   logger.info(
     { attemptId, autoScored, correctCount, wrongCount, unansweredCount, hasPendingReview },
     'evaluate: attempt scored',
   );
+}
+
+// Auto-release for pure-objective exams once the exam window has closed. Skip
+// if any question needs manual grading (teacher will release via the grading
+// UI). Skip if the window is still open, so students who finish early don't
+// leak answers to peers still writing.
+async function maybeAutoReleaseResults(exam: {
+  id: string;
+  endAt: Date | null;
+  resultsReleased: boolean;
+  questions: Array<{ question: { type: string } }>;
+}): Promise<void> {
+  if (exam.resultsReleased) return;
+  const hasSubjective = exam.questions.some((eq) => !OBJECTIVE_TYPES.has(eq.question.type));
+  if (hasSubjective) return;
+  if (exam.endAt && exam.endAt.getTime() > Date.now()) return;
+  await getPrisma().exam.update({
+    where: { id: exam.id },
+    data: { resultsReleased: true },
+  });
+  logger.info({ examId: exam.id }, 'evaluate: auto-released results for pure-objective exam');
 }
 
 // Called from the grading module once a teacher finalises subjective marks.

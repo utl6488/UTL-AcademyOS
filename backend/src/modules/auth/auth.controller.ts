@@ -58,6 +58,11 @@ export const resetPassword = asyncHandler(async (req: Request, res: Response) =>
   noContent(res);
 });
 
+export const acceptInvite = asyncHandler(async (req: Request, res: Response) => {
+  const result = await service.acceptInvite(req.body, meta(req));
+  ok(res, result);
+});
+
 export const listSessions = asyncHandler(async (req: Request, res: Response) => {
   if (!req.auth) throw AppError.unauthorized();
   const sessions = await service.listSessions(req.auth.userId, req.auth.tenantId);

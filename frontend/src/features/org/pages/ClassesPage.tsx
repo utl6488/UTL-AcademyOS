@@ -3,10 +3,18 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Pencil, Trash2, GraduationCap } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
+import { OrgTabs } from "../components/org-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -28,32 +36,26 @@ import {
 } from "../api/mutations";
 import { classFormSchema, type ClassFormValues, type Class } from "../schemas/org-schemas";
 import type { ColumnDef } from "@tanstack/react-table";
-
-const columns: ColumnDef<Class>[] = [
-  { accessorKey: "name", header: "Class Name" },
-  { accessorKey: "numericOrder", header: "Order" },
-  {
-    accessorKey: "branchName",
-    header: "Branch",
-    cell: ({ row }) => row.original.branchName || "All",
-  },
-  {
-    accessorKey: "sections",
-    header: "Sections",
-    cell: ({ row }) => (
-      <div className="flex flex-wrap gap-1">
-        {row.original.sections.map((s) => (
-          <Badge key={s.id} variant="secondary" className="text-xs">
-            {s.name}
-          </Badge>
-        ))}
-      </div>
-    ),
-  },
-];
+import { useAuthStore } from "@/store/auth-store";
+import { useTenantContextStore } from "@/store/tenant-context-store";
+import { useTenants } from "@/features/admin/api/queries";
 
 export default function ClassesPage() {
-  const { data: classes, isLoading, isError, refetch } = useClasses();
+  const role = useAuthStore((s) => s.user?.role);
+  const impersonatedTenantId = useTenantContextStore((s) => s.impersonatedTenantId);
+  const isGodView = role === "SUPER_ADMIN" && !impersonatedTenantId;
+
+  const [tenantId, setTenantId] = useState<string | undefined>(undefined);
+
+  const { data: tenantsData } = useTenants({ pageSize: 100 }, { enabled: isGodView });
+  const tenants = tenantsData?.data ?? [];
+
+  const {
+    data: classes,
+    isLoading,
+    isError,
+    refetch,
+  } = useClasses(isGodView ? { tenantId } : undefined);
   const createMutation = useCreateClassMutation();
   const updateMutation = useUpdateClassMutation();
   const deleteMutation = useDeleteClassMutation();
@@ -92,11 +94,44 @@ export default function ClassesPage() {
     }
   }
 
+  const baseColumns: ColumnDef<Class>[] = [
+    { accessorKey: "name", header: "Class Name" },
+    { accessorKey: "numericOrder", header: "Order" },
+    ...(isGodView
+      ? [
+          {
+            accessorKey: "tenantName",
+            header: "Institute",
+            cell: ({ row }: { row: { original: Class } }) => row.original.tenantName || "—",
+          } as ColumnDef<Class>,
+        ]
+      : []),
+    {
+      accessorKey: "branchName",
+      header: "Branch",
+      cell: ({ row }) => row.original.branchName || "All",
+    },
+    {
+      accessorKey: "sections",
+      header: "Sections",
+      cell: ({ row }) => (
+        <div className="flex flex-wrap gap-1">
+          {row.original.sections.map((s) => (
+            <Badge key={s.id} variant="secondary" className="text-xs">
+              {s.name}
+            </Badge>
+          ))}
+        </div>
+      ),
+    },
+  ];
+
   if (isLoading) return <LoadingSkeleton variant="table" />;
   if (isError) return <ErrorState onRetry={() => refetch()} />;
 
   return (
     <div className="space-y-6">
+      <OrgTabs />
       <PageHeader
         title="Classes & Sections"
         description="Manage academic classes and their sections"
@@ -106,6 +141,24 @@ export default function ClassesPage() {
           </Button>
         }
       />
+
+      {isGodView && (
+        <div className="flex flex-wrap gap-3">
+          <Select value={tenantId || ""} onValueChange={(v) => setTenantId(v || undefined)}>
+            <SelectTrigger className="w-56">
+              <SelectValue placeholder="All institutes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All institutes</SelectItem>
+              {tenants.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {classes?.length === 0 ? (
         <EmptyState
@@ -117,7 +170,7 @@ export default function ClassesPage() {
       ) : (
         <DataTable
           columns={[
-            ...columns,
+            ...baseColumns,
             {
               id: "actions",
               cell: ({ row }) => (

@@ -124,3 +124,16 @@ export const instituteDashboardSchema = z.object({
 });
 
 export type InstituteDashboard = z.infer<typeof instituteDashboardSchema>;
+
+export const myAttemptSchema = z.object({
+  attemptId: z.string(),
+  examId: z.string(),
+  examTitle: z.string(),
+  status: z.enum(["SUBMITTED", "AUTO_SUBMITTED", "EVALUATED"]),
+  submittedAt: z.string(),
+  resultsReleased: z.boolean(),
+  score: z.number().nullable(),
+  maxScore: z.number(),
+});
+
+export type MyAttempt = z.infer<typeof myAttemptSchema>;

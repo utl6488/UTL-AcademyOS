@@ -7,6 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -26,6 +33,8 @@ import {
 } from "../api/mutations";
 import { formatDateTime } from "@/lib/format";
 import { useAuthStore } from "@/store/auth-store";
+import { useTenantContextStore } from "@/store/tenant-context-store";
+import { useTenants } from "@/features/admin/api/queries";
 import type { ExamListItem, ExamStatus } from "../schemas/exam-schemas";
 
 const STATUS_BADGE: Record<
@@ -45,8 +54,19 @@ export default function ExamListPage() {
   const statusFilter = tab === "all" ? undefined : (tab as ExamStatus);
 
   const canManage = useAuthStore((s) => s.hasPermission("exam:manage"));
+  const role = useAuthStore((s) => s.user?.role);
+  const impersonatedTenantId = useTenantContextStore((s) => s.impersonatedTenantId);
+  const isGodView = role === "SUPER_ADMIN" && !impersonatedTenantId;
 
-  const { data, isLoading, isError, refetch } = useExams({ status: statusFilter });
+  const [tenantId, setTenantId] = useState<string | undefined>(undefined);
+
+  const { data: tenantsData } = useTenants({ pageSize: 100 }, { enabled: isGodView });
+  const tenants = tenantsData?.data ?? [];
+
+  const { data, isLoading, isError, refetch } = useExams({
+    status: statusFilter,
+    ...(isGodView ? { tenantId } : {}),
+  });
   const deleteMutation = useDeleteExamMutation();
   const duplicateMutation = useDuplicateExamMutation();
   const unpublishMutation = useUnpublishExamMutation();
@@ -66,6 +86,15 @@ export default function ExamListPage() {
         </div>
       ),
     },
+    ...(isGodView
+      ? [
+          {
+            accessorKey: "tenantName",
+            header: "Institute",
+            cell: ({ row }: { row: { original: ExamListItem } }) => row.original.tenantName || "—",
+          } as ColumnDef<ExamListItem>,
+        ]
+      : []),
     {
       accessorKey: "mode",
       header: "Mode",
@@ -115,9 +144,19 @@ export default function ExamListPage() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => navigate(`/exams/${row.original.id}`)}>
-              {canManage && row.original.status === "draft" ? "Edit" : "View Details"}
-            </DropdownMenuItem>
+            {!canManage && row.original.status === "live" && (
+              <DropdownMenuItem onClick={() => navigate(`/exam/${row.original.id}/attempt`)}>
+                Take Exam
+              </DropdownMenuItem>
+            )}
+            {!canManage && row.original.status === "completed" && (
+              <DropdownMenuItem onClick={() => navigate("/results")}>View Results</DropdownMenuItem>
+            )}
+            {canManage && (
+              <DropdownMenuItem onClick={() => navigate(`/exams/${row.original.id}`)}>
+                {row.original.status === "draft" ? "Edit" : "View Details"}
+              </DropdownMenuItem>
+            )}
             {row.original.status === "live" && row.original.mode === "SYNCHRONOUS" && canManage && (
               <DropdownMenuItem onClick={() => navigate(`/exams/${row.original.id}/live-console`)}>
                 Live Console
@@ -171,6 +210,24 @@ export default function ExamListPage() {
           ) : null
         }
       />
+
+      {isGodView && (
+        <div className="flex flex-wrap gap-3">
+          <Select value={tenantId || ""} onValueChange={(v) => setTenantId(v || undefined)}>
+            <SelectTrigger className="w-56">
+              <SelectValue placeholder="All institutes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All institutes</SelectItem>
+              {tenants.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>

@@ -9,6 +9,7 @@ export const UserListQuerySchema = z.object({
   status: z.enum(['ACTIVE', 'INVITED', 'SUSPENDED', 'DELETED']).optional(),
   classId: z.string().optional(),
   batchId: z.string().optional(),
+  tenantId: z.string().optional(),
   sortBy: z.string().optional(),
   sortOrder: z.enum(['asc', 'desc']).default('asc'),
   search: z.string().optional(),
@@ -18,7 +19,9 @@ export type UserListQuery = z.infer<typeof UserListQuerySchema>;
 export const InviteUserSchema = z.object({
   email: z.string().email(),
   name: z.string().min(2).max(120),
-  role: z.enum(['ADMIN', 'TEACHER', 'EXAM_COORDINATOR']),
+  role: z.enum(['ADMIN', 'TEACHER', 'EXAM_COORDINATOR', 'STUDENT']),
+  classId: z.string().optional(),
+  batchId: z.string().optional(),
 });
 export type InviteUserInput = z.infer<typeof InviteUserSchema>;
 
@@ -30,6 +33,7 @@ export const UpdateUserSchema = z
     branchId: z.string().nullable().optional(),
     classId: z.string().nullable().optional(),
     sectionId: z.string().nullable().optional(),
+    batchId: z.string().nullable().optional(),
   })
   .strict();
 export type UpdateUserInput = z.infer<typeof UpdateUserSchema>;

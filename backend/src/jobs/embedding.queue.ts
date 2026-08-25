@@ -15,6 +15,6 @@ export interface EmbeddingJobData {
  */
 export function enqueueEmbedding(job: EmbeddingJobData) {
   return getQueue(QueueName.EMBEDDING).add('embed', job, {
-    jobId: `${job.tenantId}:${job.sourceType}:${job.sourceId}`,
+    jobId: `${job.tenantId}-${job.sourceType}-${job.sourceId}`,
   });
 }

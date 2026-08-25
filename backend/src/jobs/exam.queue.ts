@@ -16,7 +16,7 @@ export function enqueueExamPublished(data: ExamPublishedJobData) {
   return getQueue(EXAM_NOTIFY_QUEUE_NAME as unknown as LocalQueueName as QueueName).add(
     'exam.published',
     data,
-    { jobId: `exam-published:${data.examId}` },
+    { jobId: `exam-published-${data.examId}` },
   );
 }
 
@@ -30,7 +30,7 @@ export interface AutoSubmitJobData {
 export function enqueueAutoSubmit(data: AutoSubmitJobData, delayMs: number) {
   return getQueue(QueueName.EXAM_AUTOSUBMIT).add('attempt.autosubmit', data, {
     delay: delayMs,
-    jobId: `autosubmit:${data.attemptId}`,
+    jobId: `autosubmit-${data.attemptId}`,
   });
 }
 

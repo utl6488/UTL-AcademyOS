@@ -7,6 +7,8 @@ export const branchSchema = z.object({
   code: z.string().nullable(),
   address: z.string().nullable(),
   isActive: z.boolean(),
+  tenantId: z.string().optional(),
+  tenantName: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -42,6 +44,8 @@ export const classSchema = z.object({
   branchId: z.string().nullable(),
   branchName: z.string().nullable(),
   sections: z.array(z.object({ id: z.string(), name: z.string() })),
+  tenantId: z.string().optional(),
+  tenantName: z.string().nullable().optional(),
   createdAt: z.string(),
 });
 
@@ -66,6 +70,8 @@ export const batchSchema = z.object({
   teacherName: z.string().nullable(),
   studentCount: z.number(),
   isActive: z.boolean(),
+  tenantId: z.string().optional(),
+  tenantName: z.string().nullable().optional(),
   createdAt: z.string(),
 });
 
@@ -88,6 +94,8 @@ export const subjectSchema = z.object({
   code: z.string().nullable(),
   classIds: z.array(z.string()),
   topicCount: z.number(),
+  tenantId: z.string().optional(),
+  tenantName: z.string().nullable().optional(),
   createdAt: z.string(),
 });
 

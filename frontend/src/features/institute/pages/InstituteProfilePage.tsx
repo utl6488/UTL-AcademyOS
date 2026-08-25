@@ -1,7 +1,10 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
+import { Navigate } from "react-router-dom";
 import { Building2, Upload } from "lucide-react";
+import { useAuthStore } from "@/store/auth-store";
+import { useTenantContextStore } from "@/store/tenant-context-store";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +28,15 @@ import {
 } from "../schemas/institute-schemas";
 
 export default function InstituteProfilePage() {
+  const role = useAuthStore((s) => s.user?.role);
+  const impersonatedTenantId = useTenantContextStore((s) => s.impersonatedTenantId);
+  const isGodView = role === "SUPER_ADMIN" && !impersonatedTenantId;
+
   const { data: institute, isLoading, isError, refetch } = useInstituteProfile();
+
+  // In god view there isn't a single "current institute" — send SUPER_ADMIN
+  // to the full tenant list instead.
+  if (isGodView) return <Navigate to="/admin/tenants" replace />;
   const { mutate: updateInstitute, isPending: isUpdating } = useUpdateInstituteMutation();
   const { mutate: uploadLogo, isPending: isUploading } = useUploadLogoMutation();
 

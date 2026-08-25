@@ -28,6 +28,9 @@ import { useQuestions, type QuestionFilters } from "../api/queries";
 import { useDeleteQuestionMutation, useBulkExportQuestionsMutation } from "../api/mutations";
 import { useSubjects, useTopics } from "@/features/org/api/queries";
 import type { QuestionListItem, QuestionType, Difficulty } from "../schemas/question-schemas";
+import { useAuthStore } from "@/store/auth-store";
+import { useTenantContextStore } from "@/store/tenant-context-store";
+import { useTenants } from "@/features/admin/api/queries";
 
 const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
   MCQ: "MCQ",
@@ -48,7 +51,14 @@ const DIFFICULTY_VARIANT: Record<Difficulty, "success" | "warning" | "destructiv
 
 export default function QuestionListPage() {
   const navigate = useNavigate();
+  const role = useAuthStore((s) => s.user?.role);
+  const impersonatedTenantId = useTenantContextStore((s) => s.impersonatedTenantId);
+  const isGodView = role === "SUPER_ADMIN" && !impersonatedTenantId;
+
   const [filters, setFilters] = useState<QuestionFilters>({});
+
+  const { data: tenantsData } = useTenants({ pageSize: 100 }, { enabled: isGodView });
+  const tenants = tenantsData?.data ?? [];
 
   const { data, isLoading, isError, refetch } = useQuestions(filters);
   const { data: subjects } = useSubjects();
@@ -71,6 +81,16 @@ export default function QuestionListPage() {
         <Badge variant="secondary">{QUESTION_TYPE_LABELS[row.original.type]}</Badge>
       ),
     },
+    ...(isGodView
+      ? [
+          {
+            accessorKey: "tenantName",
+            header: "Institute",
+            cell: ({ row }: { row: { original: QuestionListItem } }) =>
+              row.original.tenantName || "—",
+          } as ColumnDef<QuestionListItem>,
+        ]
+      : []),
     {
       accessorKey: "subjectName",
       header: "Subject",
@@ -165,6 +185,24 @@ export default function QuestionListPage() {
           value={filters.search || ""}
           onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
         />
+        {isGodView && (
+          <Select
+            value={filters.tenantId || ""}
+            onValueChange={(v) => setFilters((f) => ({ ...f, tenantId: v || undefined }))}
+          >
+            <SelectTrigger className="w-56">
+              <SelectValue placeholder="All institutes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All institutes</SelectItem>
+              {tenants.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Select
           value={filters.subjectId || ""}
           onValueChange={(v) =>

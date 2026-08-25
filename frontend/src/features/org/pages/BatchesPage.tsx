@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Pencil, Trash2, Users } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
+import { OrgTabs } from "../components/org-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,29 +36,26 @@ import {
 } from "../api/mutations";
 import { batchFormSchema, type BatchFormValues, type Batch } from "../schemas/org-schemas";
 import type { ColumnDef } from "@tanstack/react-table";
-
-const columns: ColumnDef<Batch>[] = [
-  { accessorKey: "name", header: "Batch Name" },
-  { accessorKey: "className", header: "Class" },
-  {
-    accessorKey: "teacherName",
-    header: "Teacher",
-    cell: ({ row }) => row.original.teacherName || "—",
-  },
-  { accessorKey: "studentCount", header: "Students" },
-  {
-    accessorKey: "isActive",
-    header: "Status",
-    cell: ({ row }) => (
-      <Badge variant={row.original.isActive ? "success" : "secondary"}>
-        {row.original.isActive ? "Active" : "Inactive"}
-      </Badge>
-    ),
-  },
-];
+import { useAuthStore } from "@/store/auth-store";
+import { useTenantContextStore } from "@/store/tenant-context-store";
+import { useTenants } from "@/features/admin/api/queries";
 
 export default function BatchesPage() {
-  const { data: batches, isLoading, isError, refetch } = useBatches();
+  const role = useAuthStore((s) => s.user?.role);
+  const impersonatedTenantId = useTenantContextStore((s) => s.impersonatedTenantId);
+  const isGodView = role === "SUPER_ADMIN" && !impersonatedTenantId;
+
+  const [tenantId, setTenantId] = useState<string | undefined>(undefined);
+
+  const { data: tenantsData } = useTenants({ pageSize: 100 }, { enabled: isGodView });
+  const tenants = tenantsData?.data ?? [];
+
+  const {
+    data: batches,
+    isLoading,
+    isError,
+    refetch,
+  } = useBatches(isGodView ? { tenantId } : undefined);
   const { data: classes } = useClasses();
   const createMutation = useCreateBatchMutation();
   const updateMutation = useUpdateBatchMutation();
@@ -97,11 +95,41 @@ export default function BatchesPage() {
     }
   }
 
+  const baseColumns: ColumnDef<Batch>[] = [
+    { accessorKey: "name", header: "Batch Name" },
+    { accessorKey: "className", header: "Class" },
+    ...(isGodView
+      ? [
+          {
+            accessorKey: "tenantName",
+            header: "Institute",
+            cell: ({ row }: { row: { original: Batch } }) => row.original.tenantName || "—",
+          } as ColumnDef<Batch>,
+        ]
+      : []),
+    {
+      accessorKey: "teacherName",
+      header: "Teacher",
+      cell: ({ row }) => row.original.teacherName || "—",
+    },
+    { accessorKey: "studentCount", header: "Students" },
+    {
+      accessorKey: "isActive",
+      header: "Status",
+      cell: ({ row }) => (
+        <Badge variant={row.original.isActive ? "success" : "secondary"}>
+          {row.original.isActive ? "Active" : "Inactive"}
+        </Badge>
+      ),
+    },
+  ];
+
   if (isLoading) return <LoadingSkeleton variant="table" />;
   if (isError) return <ErrorState onRetry={() => refetch()} />;
 
   return (
     <div className="space-y-6">
+      <OrgTabs />
       <PageHeader
         title="Batches"
         description="Manage student batches and assign teachers"
@@ -111,6 +139,24 @@ export default function BatchesPage() {
           </Button>
         }
       />
+
+      {isGodView && (
+        <div className="flex flex-wrap gap-3">
+          <Select value={tenantId || ""} onValueChange={(v) => setTenantId(v || undefined)}>
+            <SelectTrigger className="w-56">
+              <SelectValue placeholder="All institutes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All institutes</SelectItem>
+              {tenants.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {batches?.length === 0 ? (
         <EmptyState
@@ -122,7 +168,7 @@ export default function BatchesPage() {
       ) : (
         <DataTable
           columns={[
-            ...columns,
+            ...baseColumns,
             {
               id: "actions",
               cell: ({ row }) => (

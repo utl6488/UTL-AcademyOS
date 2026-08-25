@@ -24,16 +24,9 @@ const STATUS_TO_API: Record<ExamStatus, ApiExamStatus> = {
   COMPLETED: 'completed',
   CANCELLED: 'cancelled',
 };
-const STATUS_TO_DB: Record<ApiExamStatus, ExamStatus> = {
-  draft: 'DRAFT',
-  scheduled: 'SCHEDULED',
-  live: 'LIVE',
-  completed: 'COMPLETED',
-  cancelled: 'CANCELLED',
-};
-
 type ExamRels = Exam & {
   createdBy: { id: string; name: string } | null;
+  tenant?: { id: string; name: string } | null;
   sections: Array<{
     id: string;
     title: string;
@@ -63,6 +56,7 @@ type ExamRels = Exam & {
 
 const RELATIONS = {
   createdBy: { select: { id: true, name: true } },
+  tenant: { select: { id: true, name: true } },
   sections: {
     orderBy: { order: 'asc' as const },
     include: {
@@ -82,11 +76,29 @@ const RELATIONS = {
 // Serializers
 // ---------------------------------------------------------------------------
 
+// The stored status only changes via publish/unpublish. `live` and `completed`
+// are time-derived at read: a published exam is live between startAt and endAt,
+// and completed after endAt. This keeps the API honest without a wall-clock cron.
+function effectiveStatus(e: {
+  status: ExamStatus;
+  startAt: Date | null;
+  endAt: Date | null;
+}): ApiExamStatus {
+  if (e.status === 'DRAFT' || e.status === 'CANCELLED' || e.status === 'COMPLETED') {
+    return STATUS_TO_API[e.status];
+  }
+  const now = Date.now();
+  if (e.endAt && e.endAt.getTime() < now) return 'completed';
+  if (e.startAt && e.startAt.getTime() > now) return 'scheduled';
+  if (e.startAt && e.startAt.getTime() <= now) return 'live';
+  return STATUS_TO_API[e.status];
+}
+
 function toListItem(e: ExamRels) {
   return {
     id: e.id,
     title: e.title,
-    status: STATUS_TO_API[e.status],
+    status: effectiveStatus(e),
     mode: e.mode as ApiExamMode,
     totalMarks: e.totalMarks,
     durationMinutes: e.durationMinutes,
@@ -94,6 +106,8 @@ function toListItem(e: ExamRels) {
     startAt: e.startAt?.toISOString() ?? null,
     endAt: e.endAt?.toISOString() ?? null,
     activeAttempts: 0, // populated by Phase 6 attempts module
+    tenantId: e.tenantId,
+    tenantName: e.tenant?.name ?? null,
     createdAt: e.createdAt.toISOString(),
     updatedAt: e.updatedAt.toISOString(),
   };
@@ -136,16 +150,45 @@ function toDetail(e: ExamRels) {
 // ---------------------------------------------------------------------------
 
 export async function listExams(query: ExamListQuery, opts: { role?: string } = {}) {
-  const where: Prisma.ExamWhereInput = {};
-  if (query.status) where.status = STATUS_TO_DB[query.status];
-  if (query.mode) where.mode = query.mode;
-  if (query.search) {
-    where.title = { contains: query.search, mode: 'insensitive' };
-  }
-  // Students should never see draft exams — they're author-only until published.
-  if (opts.role === 'STUDENT') {
-    where.status = { in: ['SCHEDULED', 'LIVE', 'COMPLETED'] };
-  }
+  const isStudent = opts.role === 'STUDENT';
+  const now = new Date();
+
+  // Filter for the requested tab. `live` / `completed` are time-derived on
+  // stored SCHEDULED|LIVE rows since we don't have a cron to flip the enum.
+  const tabWhere: Prisma.ExamWhereInput | undefined = (() => {
+    if (!query.status) return undefined;
+    const published = ['SCHEDULED', 'LIVE'] as const;
+    switch (query.status) {
+      case 'draft':
+        return isStudent ? { id: '__none__' } : { status: 'DRAFT' };
+      case 'cancelled':
+        return isStudent ? { id: '__none__' } : { status: 'CANCELLED' };
+      case 'scheduled':
+        return {
+          status: { in: [...published] },
+          OR: [{ startAt: null }, { startAt: { gt: now } }],
+        };
+      case 'live':
+        return {
+          status: { in: [...published] },
+          startAt: { lte: now },
+          OR: [{ endAt: null }, { endAt: { gte: now } }],
+        };
+      case 'completed':
+        return {
+          OR: [{ status: 'COMPLETED' }, { status: { in: [...published] }, endAt: { lt: now } }],
+        };
+    }
+  })();
+
+  const clauses: Prisma.ExamWhereInput[] = [];
+  if (tabWhere) clauses.push(tabWhere);
+  // Students never see draft/cancelled exams — author-only until published.
+  if (isStudent) clauses.push({ status: { in: ['SCHEDULED', 'LIVE', 'COMPLETED'] } });
+  if (query.mode) clauses.push({ mode: query.mode });
+  if (query.search) clauses.push({ title: { contains: query.search, mode: 'insensitive' } });
+  if (query.tenantId) clauses.push({ tenantId: query.tenantId });
+  const where: Prisma.ExamWhereInput = clauses.length ? { AND: clauses } : {};
 
   const orderBy: Prisma.ExamOrderByWithRelationInput = { [query.sortBy]: query.sortOrder };
 
